@@ -46,7 +46,7 @@ class CommunityAssessment:
         # of active_columns?
         self.active_columns = [0, 1, 14, 2, 3, 4, 5, 6, 7, 8, 11, 9, 10, 13]
 
-    def create_formats(workbook):
+    def create_formats(self, workbook):
         formats = {}
 
         formats['top_header'] = workbook.add_format({
@@ -284,94 +284,95 @@ class CommunityAssessment:
     def calculate_distances(self):
 
         # Create faclist geodataframe
+        
         faclist_gdf = gpd.GeoDataFrame(
-            self.faclist_df, geometry=gpd.points_from_xy(self.faclist_df.lon,
-                                                         self.faclist_df.lat,
-                                                         crs="EPSG:4269"))
+            self.faclist_df, geometry=gpd.points_from_xy(
+                self.faclist_df.lon, self.faclist_df.lat, crs="EPSG:4269"))
         faclist_gdf = faclist_gdf.to_crs(32663)
-
+        
         # Create censusblks geodataframe
         censusblks_gdf = gpd.GeoDataFrame(
-            self.censusblks_df, geometry=gpd.points_from_xy(self.censusblks_df.lon,
-                                                       self.censusblks_df.lat,
-                                                       crs="EPSG:4269"))
+            self.censusblks_df, geometry = gpd.points_from_xy(
+                self.censusblks_df.lon, self.censusblks_df.lat, crs="EPSG:4269"))
         censusblks_gdf = censusblks_gdf.to_crs(32663)
-
-        # Calculate distances
-        # Currently only handles 1 facility, unsure how to append data for
-        # multiple facilities and still produce output. Also needs to ensure
-        # filtering of census blocks, removing schools and monitors as HEM4 does.
-        fac_dist = [[0]*2 for _ in range(len(faclist_gdf))]
-
-        for index in faclist_gdf.index:
-            distances_df = censusblks_gdf.geometry.apply(
-                lambda g: faclist_gdf.geometry[index].distance(g))
-            fac_dist[index][0] = faclist_gdf['facility_id'][index]
-            fac_dist[index][1] = distances_df
-
-        print(fac_dist)
-
-        # Append distance values
-        censusblksjoin_gdf = censusblks_gdf.join(distances_df, how='left')
-        blksinrange_gdf = censusblksjoin_gdf[censusblksjoin_gdf['distance'] <= self.radius * 1000]
-        blksinrange_gdf['blkid'] = blksinrange_gdf.blkid.apply(lambda g: '0' + g if len(g) == 14 else g)
-        blksinrange_gdf['bkgrp'] = blksinrange_gdf['blkid'].astype(str).str[0:12]
-
-        # Merge with ACS
-        # Note: Current merge only picks up numeric census blk ids, some blkids
-        # have other characters not caught in ACS file
-        acsinrange_gdf = blksinrange_gdf.merge(
-            self.acs_df.astype({'bkgrp': 'str'}),
-            left_on='bkgrp', right_on='bkgrp')
         
-        cols = ['population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
-                'pnh_am_ind', 'pnh_othmix', 'pt_hisp', 'p_agelt18', 'p_agegt64',
-                'p_2xpov', 'p_pov', 'age_25up', 'p_edulths', 'p_lingiso',
-                'age_univ', 'pov_univ', 'edu_univ', 'iso_univ', 'pov_fl', 'iso_fl']
-        acsinrange_df = pd.DataFrame(acsinrange_gdf, columns=cols)
-
-        distances_df[index] = pd.DataFrame(distances_df[index]).rename(columns={'geometry': 'distance'})
-
+        # Calculate distances
+        # Currently only handles 1 facility, unsure how to append data for multiple facilities and
+        # still produce output. Also needs to ensure filtering of census blocks, removing schools
+        # and monitors as HEM4 does.
+        self.facility_bin = [[0]*16 for _ in range(2*len(self.faclist_df))]
+        
+        for index in faclist_gdf.index:
+            distances = censusblks_gdf.geometry.apply(
+                lambda g: faclist_gdf.geometry[index].distance(g))
+            distances_df = pd.DataFrame(distances).rename(columns={'geometry': 'distance'})
+        
+            # Append distance values
+            # This is where I am pulling block groups from block data, it may be here we implement
+            # the cleaning that takes place in the HEM4 community assessment module.
+            censusblksjoin_gdf = censusblks_gdf.join(distances_df, how='left')
+            blksinrange_gdf = censusblksjoin_gdf[censusblksjoin_gdf['distance'] <= self.radius*1000]
+            blksinrange_gdf['blkid'] = blksinrange_gdf.blkid.apply(
+                lambda g: '0' + g if len(g) == 14 else g)
+            blksinrange_gdf['bkgrp'] = blksinrange_gdf['blkid'].astype(str).str[0:12]
+        
+            # Merge with ACS
+            # Note: Current merge only picks up numeric census blk ids, some blkids have other
+            # characters not caught in ACS file.
+            acsinrange_gdf = blksinrange_gdf.merge(
+                self.acs_df.astype({'bkgrp': 'str'}), left_on='bkgrp', right_on='bkgrp')
+            
+            acs_columns = ['population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
+                           'pnh_am_ind', 'pnh_othmix', 'pt_hisp', 'p_agelt18', 'p_agegt64',
+                           'p_2xpov', 'p_pov', 'age_25up', 'p_edulths', 'p_lingiso',
+                           'age_univ', 'pov_univ', 'edu_univ', 'iso_univ', 'pov_fl', 'iso_fl']
+            acsinrange_df = pd.DataFrame(acsinrange_gdf, columns=acs_columns)
+        
+            # Create facility bin and tabulate population weighted demographic stats for each sub
+            # group.
+            acsinrange_df.apply(lambda row: self.tabulate_facility_data(row), axis=1)
+        
+            # Calculate averages by dividing population for each sub group
+            for col_index in range(1, 16):
+                if col_index == 11:
+                    if (100 * self.facility_bin[2 * index][col_index]) == 0:
+                        self.facility_bin[(2 * index) + 1][col_index] = 0
+                    else:
+                        self.facility_bin[(2 * index) + 1][col_index] = self.facility_bin[(2 * index) + 1][col_index] / (100 * self.facility_bin[2 * index][0])
+                else:
+                    if (100 * self.facility_bin[2 * index][col_index]) == 0:
+                        self.facility_bin[(2 * index) + 1][col_index] = 0
+                    else:
+                        self.facility_bin[(2 * index) + 1][col_index] = self.facility_bin[(2 * index) + 1][col_index] / (100 * self.facility_bin[2 * index][col_index])
+        
+            self.facility_bin[2*index][15] = self.facility_bin[2 * index][0] * self.facility_bin[(2 * index) + 1][15]
+            for col_index in range(1, 15):
+                if col_index == 10:
+                    self.facility_bin[2 * index][col_index] = self.facility_bin[2 * index][9] * self.facility_bin[(2 * index) + 1][col_index]
+                else:
+                    self.facility_bin[2 * index][col_index] = self.facility_bin[2 * index][0] * self.facility_bin[(2 * index) + 1][col_index]
+        
+            self.facility_bin[(2 * index) + 1][0] = ""
+        
         # Create national bin and tabulate population weighted demographic stats for each sub group.
         self.national_bin = [[0]*16 for _ in range(2)]
         self.acs_df.apply(lambda row: self.tabulate_national_data(row), axis=1)
-
+        
         # Calculate averages by dividing population for each sub group
         for index in range(1, 16):
             if index == 11:
                 self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][0])
             else:
                 self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][index])
-
+        
         self.national_bin[0][15] = self.national_bin[0][0] * self.national_bin[1][15]
         for index in range(1, 15):
             if index == 10:
                 self.national_bin[0][index] = self.national_bin[0][9] * self.national_bin[1][index]
             else:
                 self.national_bin[0][index] = self.national_bin[0][0] * self.national_bin[1][index]
-
+        
         self.national_bin[1][0] = ""
-        print(self.national_bin)
-        # Create facility bin and tabulate population weighted demographic stats for each sub group.
-        self.facility_bin = [[0]*16 for _ in range(2)]
-        acsinrange_df.apply(lambda row: self.tabulate_facility_data(row), axis=1)
-
-        # Calculate averages by dividing population for each sub group
-        for index in range(1, 16):
-            if index == 11:
-                self.facility_bin[1][index] = self.facility_bin[1][index] / (100 * self.facility_bin[0][0])
-            else:
-                self.facility_bin[1][index] = self.facility_bin[1][index] / (100 * self.facility_bin[0][index])
-
-        self.facility_bin[0][15] = self.facility_bin[0][0] * self.facility_bin[1][15]
-        for index in range(1, 15):
-            if index == 10:
-                self.facility_bin[0][index] = self.facility_bin[0][9] * self.facility_bin[1][index]
-            else:
-                self.facility_bin[0][index] = self.facility_bin[0][0] * self.facility_bin[1][index]
-
-        self.facility_bin[1][0] = ""
-        print(self.facility_bin)
 
     # Create Workbook
     # Final workbook should have similar formatting as ej tables, with two rows for nationwide demographics
@@ -387,10 +388,12 @@ class CommunityAssessment:
         worksheet = workbook.add_worksheet('Facility Demographics')
         formats = self.create_formats(workbook)
 
-        column_headers = ['Total Population', 'White', 'Minority\u1D9C', 'African American', 'Native American',
-                          'Other and Multiracial', 'Hispanic or Latino\u1D48', 'Age (Years)\n0-17', 'Age (Years)\n18-64',
-                          'Age (Years)\n>=65', 'People Living Below the Poverty Level', 'Total Number >= 25 Years Old',
-                          'Number >= 25 Years Old without a High School Diploma', 'People Living in Linguistic Isolation']
+        column_headers = ['Total Population', 'White', 'Minority\u1D9C', 'African American',
+                          'Native American', 'Other and Multiracial', 'Hispanic or Latino\u1D48',
+                          'Age (Years)\n0-17', 'Age (Years)\n18-64', 'Age (Years)\n>=65',
+                          'People Living Below the Poverty Level', 'Total Number >= 25 Years Old',
+                          'Number >= 25 Years Old without a High School Diploma',
+                          'People Living in Linguistic Isolation']
 
         firstcol = 'A'
         lastcol = chr(ord(firstcol) + len(column_headers))
@@ -419,31 +422,34 @@ class CommunityAssessment:
             worksheet.set_column(top_header_coords, 12)
             col = chr(ord(col) + 1)
 
-        # =============================================================================
-        # last_data_row = startrow + numrows
-        #
-        # # Create notes
-        # first_notes_row = last_data_row + 1
-        # last_notes_row = first_notes_row + 4
-        # firstcol = 'A'
-        # lastcol = chr(ord(firstcol) + len(column_headers) + 1)
-        # notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(last_notes_row)
-        # worksheet.merge_range(notes_coords, 'Notes:\n\n' + \
-        #                '\u1D43Total nationwide population includes all 50 states plus Puerto Rico. Total state and county ' + \
-        #                'populations include any states and counties, respectively, within the study area radius of any modeled ' + \
-        #                'facility.\nDistributions by race, ethnicity, age, education, income and linguistic isolation are based on ' + \
-        #                'demographic information at the census block group level.\n' + \
-        #                '\u1D9CThe minority population includes people identifying as African American, Native American, Other ' + \
-        #                'and Multiracial, or Hispanic/Latino. Measures are taken to avoid double counting of people identifying ' + \
-        #                'as both Hispanic/Latino and a racial minority.\n' + \
-        #                '\u1D48In order to avoid double counting, the "Hispanic or Latino" category is treated as a distinct ' + \
-        #                'demographic category for these analyses. A person is identified as one of five racial/ethnic ' + \
-        #                'categories above: White, African American, Native American, Other and Multiracial, or Hispanic/Latino.\n' + \
-        #                '\u1D49The population-weighted average risk takes into account risk levels at all. ',  formats['notes'])
-        # =============================================================================
+        # Add Facility Names
+        facname_list = self.faclist_df['facility_id'].tolist()
+        row_num = 6
+        for index, data in enumerate(facname_list):
+            worksheet.merge_range(row_num, 0, row_num + 1, 0, data, formats['sub_header_3'])
+            row_num = row_num + 2
+
+        last_data_row = 6 + len(self.facility_bin)
+
+        # Create notes
+        first_notes_row = last_data_row + 1
+        last_notes_row = first_notes_row + 4
+        firstcol = 'A'
+        lastcol = chr(ord(firstcol) + len(column_headers))
+        notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(last_notes_row)
+        worksheet.merge_range(notes_coords, 'Notes:\n\n' + \
+          '\u1D43Total nationwide population includes all 50 states plus Puerto Rico. ' + \
+          '\nDistributions by race, ethnicity, age, education, income and linguistic isolation are based on ' + \
+          'demographic information at the census block group level.\n' + \
+          '\u1D9CThe minority population includes people identifying as African American, Native American, Other ' + \
+          'and Multiracial, or Hispanic/Latino. Measures are taken to avoid double counting of people identifying ' + \
+          'as both Hispanic/Latino and a racial minority.\n' + \
+          '\u1D48In order to avoid double counting, the "Hispanic or Latino" category is treated as a distinct ' + \
+          'demographic category for these analyses. A person is identified as one of five racial/ethnic ' + \
+          'categories above: White, African American, Native American, Other and Multiracial, or Hispanic/Latino.\n' + \
+          '\u1D49The population-weighted average risk takes into account risk levels at all. ',  formats['notes'])
 
         self.append_aggregated_data(self.national_bin, worksheet, formats, 3)
         self.append_aggregated_data(self.facility_bin, worksheet, formats, 6)
 
-        print(self.national_bin)
         workbook.close()
