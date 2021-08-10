@@ -5,6 +5,8 @@ from PIL import ImageTk
 from functools import partial
 import webbrowser
 
+from tkinter import messagebox
+
 from com.sca.ca.CommunityAssessment import CommunityAssessment
 from com.sca.ca.gui.EntryWithPlaceHolder import EntryWithPlaceholder
 from com.sca.ca.gui.Styles import *
@@ -57,7 +59,7 @@ class MainView(tk.Frame):
                               text="2.", font=SMALL_TEXT_FONT, bg='white', anchor="w")
         self.step2.grid(pady=10, row=3, column=0)
 
-        fu = PIL.Image.open('images\icons8-document-48.png').resize((30,30))
+        fu = PIL.Image.open('images\icons8-document-48.png').resize((30, 30))
         ficon = self.add_margin(fu, 5, 0, 5, 0)
         fileicon = ImageTk.PhotoImage(ficon)
         self.fileLabel = tk.Label(self.faclist_frame, image=fileicon, bg='white')
@@ -80,20 +82,44 @@ class MainView(tk.Frame):
         self.radius_num["width"] = 24
         self.radius_num.grid(row=3, column=1, pady=10)
 
-        run_button = tk.Label(self.container, text="Run", font=TEXT_FONT, bg='white')
-        run_button.grid(row=5, column=2, padx=20, pady=20, sticky='E')
+        self.run_button = tk.Label(self.container, text="Run", font=TEXT_FONT,
+                                   bg='lightgrey', relief='solid', borderwidth=2, width=8)
+        self.run_button.grid(row=6, column=1, padx=20, pady=20, sticky='S')
 
-        run_button.bind("<Button-1>", self.run_reports)
+        self.run_button.bind("<Button-1>", self.run_reports)
 
     def run_reports(self, event):
 
-        print("Creating a community assessment!")
+        print("Creating a proximity analysis!")
+
+        self.show_running()
 
         ca = CommunityAssessment(self.output_dir, self.facility_list_file,
                                  self.radius_num.get_text_value())
 
         ca.calculate_distances()
         ca.create_workbook()
+
+        messagebox.showinfo("Complete", "Run complete. Check your output folder for results.")
+
+        self.reset_gui()
+
+    def show_running(self):
+        self.run_button["text"] = "Running..."
+        self.run_button["state"] = "disabled"
+        self.home.update_idletasks()
+
+    def reset_gui(self):
+        self.output_dir = None
+        self.facility_list_file = None
+
+        self.run_button["text"] = "Run"
+        self.run_button["state"] = "normal"
+        self.step1_instructions["text"] = "Select output folder"
+        self.step2_instructions["text"] = "Select facility list file"
+        self.radius_num.put_placeholder()
+
+        self.home.update_idletasks()
 
     # The folder browse handler.
     def browse(self, icon, event):
