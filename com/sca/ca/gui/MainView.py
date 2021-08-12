@@ -7,19 +7,24 @@ import webbrowser
 
 from tkinter import messagebox
 
-from com.sca.ca.CommunityAssessment import CommunityAssessment
+from com.sca.ca.FacilityProximityAssessment import FacilityProximityAssessment
 from com.sca.ca.gui.EntryWithPlaceHolder import EntryWithPlaceholder
 from com.sca.ca.gui.Styles import *
+from com.sca.ca.model.ACSDataset import ACSDataset
+from com.sca.ca.model.CensusDataset import CensusDataset
+from com.sca.ca.model.FacilityList import FacilityList
 
 
 class MainView(tk.Frame):
     def __init__(self, master, *args, **kwargs):
+        self.censusblks_df = None
+        self.acs_df = None
+
         tk.Frame.__init__(self, master=master, *args, **kwargs)
 
         # set mainframe background color
         self.output_dir = None
         self.facility_list_file = None
-
         self.home = master
         self.container = tk.Frame(self, width=400, height=300, bg=MAIN_COLOR)
         self.container.pack(fill="both", expand=True)
@@ -33,7 +38,7 @@ class MainView(tk.Frame):
         self.radius_frame.grid(row=5, columnspan=5, sticky="nsew")
 
         self.header = tk.Label(self.container, font=TEXT_FONT, bg='white', width=48,
-                               text="Community Assessment Stand-alone")
+                               text="Proximity Analysis Tool")
         self.header.grid(row=2, column=1, sticky='WE')
 
         # First step - choose an output folder
@@ -94,11 +99,25 @@ class MainView(tk.Frame):
 
         self.show_running()
 
-        ca = CommunityAssessment(self.output_dir, self.facility_list_file,
-                                 self.radius_num.get_text_value())
+        # Load auxiliary files
+        # Create censusblks dataframe
+        censusblks = CensusDataset(path="resources/us_blocks_2010.csv")
+        self.censusblks_df = censusblks.dataframe
 
-        ca.calculate_distances()
-        ca.create_workbook()
+        # Create acs dataframe
+        acs = ACSDataset(path="resources/acs.xlsx")
+        self.acs_df = acs.dataframe
+
+        # Create faclist dataframe
+        faclist = FacilityList(path=self.facility_list_file)
+        faclist_df = faclist.dataframe
+
+        assessment = FacilityProximityAssessment(output_dir=self.output_dir,
+                                                 faclist_df=faclist_df,
+                                                 radius=self.radius_num.get_text_value(),
+                                                 census_df=self.censusblks_df,
+                                                 acs_df=self.acs_df)
+        assessment.create()
 
         messagebox.showinfo("Complete", "Run complete. Check your output folder for results.")
 

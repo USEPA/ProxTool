@@ -20,24 +20,18 @@ from com.sca.ca.model.FacilityList import FacilityList
 
 
 # Describe Demographics Within Range of Specified Facilities
-class CommunityAssessment:
+class FacilityProximityAssessment:
 
-    def __init__(self, output_dir, facility_list_file, radius):
+    def __init__(self, output_dir, faclist_df, radius, census_df, acs_df):
 
         # Output path
         self.fullpath = output_dir
-
-        # Create faclist dataframe
-        faclist = FacilityList(path=facility_list_file)
-        self.faclist_df = faclist.dataframe
-
-        # Create censusblks dataframe
-        censusblks = CensusDataset(path="resources/us_blocks_2010.csv")
-        self.censusblks_df = censusblks.dataframe
-
-        # Create acs dataframe
-        acs = ACSDataset(path="resources/acs.xlsx")
-        self.acs_df = acs.dataframe
+        self.faclist_df = faclist_df
+        self.censusblks_df = census_df
+        self.acs_df = acs_df
+        self.formats = None
+        self.facility_bin = None
+        self.national_bin = None
 
         # Specify range in km
         self.radius = int(radius)
@@ -120,7 +114,6 @@ class CommunityAssessment:
     def append_aggregated_data(self, values, worksheet, formats, startrow):
 
         data = deepcopy(values)
-        print(data[0])
 
         # First, select the columns that are relevant
         row_idx = np.array([i for i in range(0, len(data))])
@@ -275,6 +268,11 @@ class CommunityAssessment:
             self.facility_bin[1][14] += pct_minority * population
             self.facility_bin[0][14] += population
 
+    def create(self):
+        self.create_workbook()
+        self.calculate_distances()
+        self.close_workbook()
+
     # Distance calculation
     # This utilizes geopandas rather than the query function used in HEM4
     # As distances will need to be calculated for each facility there are many coordinate pairs,
@@ -284,7 +282,6 @@ class CommunityAssessment:
     def calculate_distances(self):
 
         # Create faclist geodataframe
-        
         faclist_gdf = gpd.GeoDataFrame(
             self.faclist_df, geometry=gpd.points_from_xy(
                 self.faclist_df.lon, self.faclist_df.lat, crs="EPSG:4269"))
@@ -292,7 +289,7 @@ class CommunityAssessment:
         
         # Create censusblks geodataframe
         censusblks_gdf = gpd.GeoDataFrame(
-            self.censusblks_df, geometry = gpd.points_from_xy(
+            self.censusblks_df, geometry=gpd.points_from_xy(
                 self.censusblks_df.lon, self.censusblks_df.lat, crs="EPSG:4269"))
         censusblks_gdf = censusblks_gdf.to_crs(32663)
         
@@ -301,15 +298,42 @@ class CommunityAssessment:
         # still produce output. Also needs to ensure filtering of census blocks, removing schools
         # and monitors as HEM4 does.
         self.facility_bin = [[0]*16 for _ in range(2*len(self.faclist_df))]
-        
+
+        start_row = 3
+
+        # Create national bin and tabulate population weighted demographic stats for each sub group.
+        self.national_bin = [[0]*16 for _ in range(2)]
+        self.acs_df.apply(lambda row: self.tabulate_national_data(row), axis=1)
+
+        # Calculate averages by dividing population for each sub group
+        for index in range(1, 16):
+            if index == 11:
+                self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][0])
+            else:
+                self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][index])
+
+        self.national_bin[0][15] = self.national_bin[0][0] * self.national_bin[1][15]
+        for index in range(1, 15):
+            if index == 10:
+                self.national_bin[0][index] = self.national_bin[0][9] * self.national_bin[1][index]
+            else:
+                self.national_bin[0][index] = self.national_bin[0][0] * self.national_bin[1][index]
+
+        self.national_bin[1][0] = ""
+        start_row = self.append_aggregated_data(
+            self.national_bin, self.worksheet, self.formats, start_row) + 1
+
         for index in faclist_gdf.index:
             distances = censusblks_gdf.geometry.apply(
                 lambda g: faclist_gdf.geometry[index].distance(g))
             distances_df = pd.DataFrame(distances).rename(columns={'geometry': 'distance'})
         
             # Append distance values
-            # This is where I am pulling block groups from block data, it may be here we implement
-            # the cleaning that takes place in the HEM4 community assessment module.
+            # Remove blocks corresponding to schools, monitors, etc.
+            censusblks_gdf = censusblks_gdf.loc[
+                (~censusblks_gdf['blkid'].str.contains('S')) &
+                (~censusblks_gdf['blkid'].str.contains('M'))]
+
             censusblksjoin_gdf = censusblks_gdf.join(distances_df, how='left')
             blksinrange_gdf = censusblksjoin_gdf[censusblksjoin_gdf['distance'] <= self.radius*1000]
             blksinrange_gdf['blkid'] = blksinrange_gdf.blkid.apply(
@@ -353,40 +377,24 @@ class CommunityAssessment:
                     self.facility_bin[2 * index][col_index] = self.facility_bin[2 * index][0] * self.facility_bin[(2 * index) + 1][col_index]
         
             self.facility_bin[(2 * index) + 1][0] = ""
-        
-        # Create national bin and tabulate population weighted demographic stats for each sub group.
-        self.national_bin = [[0]*16 for _ in range(2)]
-        self.acs_df.apply(lambda row: self.tabulate_national_data(row), axis=1)
-        
-        # Calculate averages by dividing population for each sub group
-        for index in range(1, 16):
-            if index == 11:
-                self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][0])
-            else:
-                self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][index])
-        
-        self.national_bin[0][15] = self.national_bin[0][0] * self.national_bin[1][15]
-        for index in range(1, 15):
-            if index == 10:
-                self.national_bin[0][index] = self.national_bin[0][9] * self.national_bin[1][index]
-            else:
-                self.national_bin[0][index] = self.national_bin[0][0] * self.national_bin[1][index]
-        
-        self.national_bin[1][0] = ""
+
+            start_row = self.append_aggregated_data(
+                self.facility_bin, self.worksheet, self.formats, start_row) + 1
 
     # Create Workbook
-    # Final workbook should have similar formatting as ej tables, with two rows for nationwide demographics
-    # (population and percentages) and two rows for each facility provided in the original faclist.
-    # Facility names should also be provided in column A, although that has not yet been added.
+    # Final workbook should have similar formatting as ej tables, with two rows for nationwide
+    # demographics (population and percentages) and two rows for each facility provided in the
+    # original faclist. Facility names should also be provided in column A, although that has not
+    # yet been added.
     def create_workbook(self):
-        output_dir = os.path.join(self.fullpath, "FacDemogTool")
+        output_dir = self.fullpath
         if not (os.path.exists(output_dir) or os.path.isdir(output_dir)):
             os.mkdir(output_dir)
-        filename = os.path.join(output_dir, 'test.xlsx')
+        filename = os.path.join(output_dir, 'proximity.xlsx')
         tablename = 'Population Demographics within ' + str(self.radius) + ' km of Source Facilities'
-        workbook = xlsxwriter.Workbook(filename)
-        worksheet = workbook.add_worksheet('Facility Demographics')
-        formats = self.create_formats(workbook)
+        self.workbook = xlsxwriter.Workbook(filename)
+        self.worksheet = self.workbook.add_worksheet('Facility Demographics')
+        self.formats = self.create_formats(self.workbook)
 
         column_headers = ['Total Population', 'White', 'Minority\u1D9C', 'African American',
                           'Native American', 'Other and Multiracial', 'Hispanic or Latino\u1D48',
@@ -400,36 +408,36 @@ class CommunityAssessment:
         top_header_coords = firstcol+'1:'+lastcol+'1'
 
         # Increase the cell size of the merged cells to highlight the formatting.
-        worksheet.set_column(top_header_coords, 12)
-        worksheet.set_row(0, 30)
+        self.worksheet.set_column(top_header_coords, 12)
+        self.worksheet.set_row(0, 30)
 
         # Create top level header
-        worksheet.merge_range(top_header_coords, tablename, formats['top_header'])
+        self.worksheet.merge_range(top_header_coords, tablename, self.formats['top_header'])
 
         # Create column headers
-        worksheet.merge_range("A2:A3", 'Population Basis',  formats['sub_header_2'])
-        worksheet.merge_range("A4:A5", 'Nationwide', formats['sub_header_2'])
-        worksheet.merge_range("B2:N2", 'Demographic Group',  formats['sub_header_3'])
+        self.worksheet.merge_range("A2:A3", 'Population Basis', self.formats['sub_header_2'])
+        self.worksheet.merge_range("A4:A5", 'Nationwide', self.formats['sub_header_2'])
+        self.worksheet.merge_range("B2:N2", 'Demographic Group',  self.formats['sub_header_3'])
 
-        worksheet.set_row(2, 72, formats['sub_header_2'])
+        self.worksheet.set_row(2, 72, self.formats['sub_header_2'])
         for col_num, data in enumerate(column_headers):
-            worksheet.write(2, col_num+1, data)
+            self.worksheet.write(2, col_num+1, data)
 
         col = 'B'
         for header in column_headers:
             header_coords = col+'4:'+col+'5'
-            worksheet.merge_range(header_coords, header,  formats['sub_header_3'])
-            worksheet.set_column(top_header_coords, 12)
+            self.worksheet.merge_range(header_coords, header, self.formats['sub_header_3'])
+            self.worksheet.set_column(top_header_coords, 12)
             col = chr(ord(col) + 1)
 
         # Add Facility Names
         facname_list = self.faclist_df['facility_id'].tolist()
         row_num = 6
         for index, data in enumerate(facname_list):
-            worksheet.merge_range(row_num, 0, row_num + 1, 0, data, formats['sub_header_3'])
+            self.worksheet.merge_range(row_num, 0, row_num + 1, 0, data, self.formats['sub_header_3'])
             row_num = row_num + 2
 
-        last_data_row = 6 + len(self.facility_bin)
+        last_data_row = 2 * len(facname_list) + 10
 
         # Create notes
         first_notes_row = last_data_row + 1
@@ -437,7 +445,7 @@ class CommunityAssessment:
         firstcol = 'A'
         lastcol = chr(ord(firstcol) + len(column_headers))
         notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(last_notes_row)
-        worksheet.merge_range(notes_coords, 'Notes:\n\n' + \
+        self.worksheet.merge_range(notes_coords, 'Notes:\n\n' + \
           '\u1D43Total nationwide population includes all 50 states plus Puerto Rico. ' + \
           '\nDistributions by race, ethnicity, age, education, income and linguistic isolation are based on ' + \
           'demographic information at the census block group level.\n' + \
@@ -447,9 +455,7 @@ class CommunityAssessment:
           '\u1D48In order to avoid double counting, the "Hispanic or Latino" category is treated as a distinct ' + \
           'demographic category for these analyses. A person is identified as one of five racial/ethnic ' + \
           'categories above: White, African American, Native American, Other and Multiracial, or Hispanic/Latino.\n' + \
-          '\u1D49The population-weighted average risk takes into account risk levels at all. ',  formats['notes'])
+          '\u1D49The population-weighted average risk takes into account risk levels at all. ',  self.formats['notes'])
 
-        self.append_aggregated_data(self.national_bin, worksheet, formats, 3)
-        self.append_aggregated_data(self.facility_bin, worksheet, formats, 6)
-
-        workbook.close()
+    def close_workbook(self):
+        self.workbook.close()
