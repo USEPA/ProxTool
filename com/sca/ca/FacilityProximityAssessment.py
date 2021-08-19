@@ -17,7 +17,7 @@ from pandas import isna
 from com.sca.ca.model.ACSDataset import ACSDataset
 from com.sca.ca.model.CensusDataset import CensusDataset
 from com.sca.ca.model.FacilityList import FacilityList
-
+from com.sca.ca.support.UTM import *
 
 # Describe Demographics Within Range of Specified Facilities
 class FacilityProximityAssessment:
@@ -281,22 +281,6 @@ class FacilityProximityAssessment:
     # Still need to develop a way to keep distances linked to facilities for bin creation and output
     def calculate_distances(self):
 
-        # Create faclist geodataframe
-        faclist_gdf = gpd.GeoDataFrame(
-            self.faclist_df, geometry=gpd.points_from_xy(
-                self.faclist_df.lon, self.faclist_df.lat, crs="EPSG:4269"))
-        faclist_gdf = faclist_gdf.to_crs(32663)
-        
-        # Create censusblks geodataframe
-        censusblks_gdf = gpd.GeoDataFrame(
-            self.censusblks_df, geometry=gpd.points_from_xy(
-                self.censusblks_df.lon, self.censusblks_df.lat, crs="EPSG:4269"))
-        censusblks_gdf = censusblks_gdf.to_crs(32663)
-        
-        # Calculate distances
-        # Currently only handles 1 facility, unsure how to append data for multiple facilities and
-        # still produce output. Also needs to ensure filtering of census blocks, removing schools
-        # and monitors as HEM4 does.
         self.facility_bin = [[0]*16 for _ in range(2*len(self.faclist_df))]
 
         start_row = 3
@@ -323,23 +307,53 @@ class FacilityProximityAssessment:
         start_row = self.append_aggregated_data(
             self.national_bin, self.worksheet, self.formats, start_row) + 1
 
-        for index in faclist_gdf.index:
-            distances = censusblks_gdf.geometry.apply(
-                lambda g: faclist_gdf.geometry[index].distance(g))
-            distances_df = pd.DataFrame(distances).rename(columns={'geometry': 'distance'})
-        
-            # Append distance values
-            # Remove blocks corresponding to schools, monitors, etc.
-            censusblks_gdf = censusblks_gdf.loc[
-                (~censusblks_gdf['blkid'].str.contains('S')) &
-                (~censusblks_gdf['blkid'].str.contains('M'))]
 
-            censusblksjoin_gdf = censusblks_gdf.join(distances_df, how='left')
-            blksinrange_gdf = censusblksjoin_gdf[censusblksjoin_gdf['distance'] <= self.radius*1000]
-            blksinrange_gdf['blkid'] = blksinrange_gdf.blkid.apply(
-                lambda g: '0' + g if len(g) == 14 else g)
-            blksinrange_gdf['bkgrp'] = blksinrange_gdf['blkid'].astype(str).str[0:12]
-        
+        for index, row in self.faclist_df.iterrows():
+            
+            fac_lat = row['lat']
+            fac_lon = row['lon']
+            fac_latrad = radians(row['lat'])
+            fac_lonrad = radians(row['lon'])
+
+            # Convert this facility's lat/lon to UTM
+            fac_utmn, fac_utme, fac_utmz, hemi, epsg = UTM.ll2utm(fac_lat, fac_lon)
+            
+            # Create geodataframe of this one facility
+            latlon = [[fac_lat, fac_lon]]
+            fac_df = pd.DataFrame(latlon, columns=['lat', 'lon'])
+            fac_gdf = gpd.GeoDataFrame(
+                fac_df, geometry=gpd.points_from_xy(
+                fac_df.lon, fac_df.lat, crs='epsg:4269'))
+            fac_gdf = fac_gdf.to_crs(epsg)
+            
+           
+            # Subset census DF to one latitude above and one below this facility
+            census_latband = self.censusblks_df[(self.censusblks_df['lat'] >= fac_lat-1)
+                                                & (self.censusblks_df['lat'] <= fac_lat+1)]
+            
+            # Create geodataframe of census_latband and then convert CRS to UTM of facility
+            censusblks_gdf = gpd.GeoDataFrame(
+                census_latband, geometry=gpd.points_from_xy(
+                census_latband.lon, census_latband.lat, crs='epsg:4269'))
+            censusblks_gdf = censusblks_gdf.to_crs(epsg)
+            
+            censusblks_gdf['utme'] = censusblks_gdf.geometry.x
+            censusblks_gdf['utmn'] = censusblks_gdf.geometry.y
+            
+            # Compute distance between blocks and facility (in meters)
+            censusblks_gdf['dist_m'] = censusblks_gdf.apply(lambda row: np.sqrt((fac_utme - row['utme'])**2 +
+                                        (fac_utmn - row['utmn'])**2), axis=1)
+            
+            # Subset to user defined radius
+            blksinrange_gdf = censusblks_gdf[censusblks_gdf['dist_m'] <= self.radius*1000]
+
+            # Remove blocks corresponding to schools, monitors, etc.
+            blksinrange_gdf = blksinrange_gdf.loc[
+                (~blksinrange_gdf['blkid'].str.contains('S')) &
+                (~blksinrange_gdf['blkid'].str.contains('M'))]
+
+            blksinrange_gdf['bkgrp'] = blksinrange_gdf['blkid'].astype(str).str[:12]
+                        
             # Merge with ACS
             # Note: Current merge only picks up numeric census blk ids, some blkids have other
             # characters not caught in ACS file.
@@ -355,7 +369,7 @@ class FacilityProximityAssessment:
             # Create facility bin and tabulate population weighted demographic stats for each sub
             # group.
             acsinrange_df.apply(lambda row: self.tabulate_facility_data(row), axis=1)
-        
+                    
             # Calculate averages by dividing population for each sub group
             for col_index in range(1, 16):
                 if col_index == 11:

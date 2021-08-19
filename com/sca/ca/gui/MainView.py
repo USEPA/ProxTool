@@ -103,10 +103,12 @@ class MainView(tk.Frame):
         # Create censusblks dataframe
         censusblks = CensusDataset(path="resources/us_blocks_2010.csv")
         self.censusblks_df = censusblks.dataframe
+        print("Loaded census blocks")
 
         # Create acs dataframe
         acs = ACSDataset(path="resources/acs.xlsx")
         self.acs_df = acs.dataframe
+        print("Loaded ACS data")
 
         # Create faclist dataframe
         faclist = FacilityList(path=self.facility_list_file)
