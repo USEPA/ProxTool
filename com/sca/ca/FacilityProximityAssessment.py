@@ -281,6 +281,33 @@ class FacilityProximityAssessment:
     # Still need to develop a way to keep distances linked to facilities for bin creation and output
     def calculate_distances(self):
 
+        self.facility_bin = [[0]*16 for _ in range(2*len(self.faclist_df))]
+
+        start_row = 3
+
+        # Create national bin and tabulate population weighted demographic stats for each sub group.
+        self.national_bin = [[0]*16 for _ in range(2)]
+        self.acs_df.apply(lambda row: self.tabulate_national_data(row), axis=1)
+
+        # Calculate averages by dividing population for each sub group
+        for index in range(1, 16):
+            if index == 11:
+                self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][0])
+            else:
+                self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][index])
+
+        self.national_bin[0][15] = self.national_bin[0][0] * self.national_bin[1][15]
+        for index in range(1, 15):
+            if index == 10:
+                self.national_bin[0][index] = self.national_bin[0][9] * self.national_bin[1][index]
+            else:
+                self.national_bin[0][index] = self.national_bin[0][0] * self.national_bin[1][index]
+
+        self.national_bin[1][0] = ""
+        start_row = self.append_aggregated_data(
+            self.national_bin, self.worksheet, self.formats, start_row) + 1
+
+
         for index, row in self.faclist_df.iterrows():
             
             fac_lat = row['lat']
