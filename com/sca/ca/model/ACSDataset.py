@@ -6,7 +6,6 @@ import pandas as pd
 
 from com.sca.ca.model.ExcelDataset import ExcelDataset
 
-
 class ACSDataset(ExcelDataset):
 
     def get_columns(self):

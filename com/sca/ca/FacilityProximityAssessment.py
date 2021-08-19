@@ -22,9 +22,10 @@ from com.sca.ca.support.UTM import *
 # Describe Demographics Within Range of Specified Facilities
 class FacilityProximityAssessment:
 
-    def __init__(self, output_dir, faclist_df, radius, census_df, acs_df):
+    def __init__(self, filename_entry, output_dir, faclist_df, radius, census_df, acs_df):
 
         # Output path
+        self.filename_entry = str(filename_entry)
         self.fullpath = output_dir
         self.faclist_df = faclist_df
         self.censusblks_df = census_df
@@ -281,8 +282,6 @@ class FacilityProximityAssessment:
     # Still need to develop a way to keep distances linked to facilities for bin creation and output
     def calculate_distances(self):
 
-        self.facility_bin = [[0]*16 for _ in range(2*len(self.faclist_df))]
-
         start_row = 3
 
         # Create national bin and tabulate population weighted demographic stats for each sub group.
@@ -309,6 +308,10 @@ class FacilityProximityAssessment:
 
 
         for index, row in self.faclist_df.iterrows():
+            
+            print('Calculating distances for ' + self.faclist_df['facility_id'][index])
+            
+            self.facility_bin = [[0]*16 for _ in range(2)]
             
             fac_lat = row['lat']
             fac_lon = row['lon']
@@ -373,27 +376,27 @@ class FacilityProximityAssessment:
             # Calculate averages by dividing population for each sub group
             for col_index in range(1, 16):
                 if col_index == 11:
-                    if (100 * self.facility_bin[2 * index][col_index]) == 0:
-                        self.facility_bin[(2 * index) + 1][col_index] = 0
+                    if (100 * self.facility_bin[0][col_index]) == 0:
+                        self.facility_bin[1][col_index] = 0
                     else:
-                        self.facility_bin[(2 * index) + 1][col_index] = self.facility_bin[(2 * index) + 1][col_index] / (100 * self.facility_bin[2 * index][0])
+                        self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][0])
                 else:
-                    if (100 * self.facility_bin[2 * index][col_index]) == 0:
-                        self.facility_bin[(2 * index) + 1][col_index] = 0
+                    if (100 * self.facility_bin[0][col_index]) == 0:
+                        self.facility_bin[1][col_index] = 0
                     else:
-                        self.facility_bin[(2 * index) + 1][col_index] = self.facility_bin[(2 * index) + 1][col_index] / (100 * self.facility_bin[2 * index][col_index])
+                        self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][col_index])
         
-            self.facility_bin[2*index][15] = self.facility_bin[2 * index][0] * self.facility_bin[(2 * index) + 1][15]
+            self.facility_bin[0][15] = self.facility_bin[0][0] * self.facility_bin[1][15]
             for col_index in range(1, 15):
                 if col_index == 10:
-                    self.facility_bin[2 * index][col_index] = self.facility_bin[2 * index][9] * self.facility_bin[(2 * index) + 1][col_index]
+                    self.facility_bin[0][col_index] = self.facility_bin[0][9] * self.facility_bin[1][col_index]
                 else:
-                    self.facility_bin[2 * index][col_index] = self.facility_bin[2 * index][0] * self.facility_bin[(2 * index) + 1][col_index]
+                    self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
         
-            self.facility_bin[(2 * index) + 1][0] = ""
+            self.facility_bin[1][0] = ""
 
             start_row = self.append_aggregated_data(
-                self.facility_bin, self.worksheet, self.formats, start_row) + 1
+                self.facility_bin, self.worksheet, self.formats, start_row)
 
     # Create Workbook
     # Final workbook should have similar formatting as ej tables, with two rows for nationwide
@@ -404,7 +407,7 @@ class FacilityProximityAssessment:
         output_dir = self.fullpath
         if not (os.path.exists(output_dir) or os.path.isdir(output_dir)):
             os.mkdir(output_dir)
-        filename = os.path.join(output_dir, 'proximity.xlsx')
+        filename = os.path.join(output_dir, self.filename_entry + '.xlsx')
         tablename = 'Population Demographics within ' + str(self.radius) + ' km of Source Facilities'
         self.workbook = xlsxwriter.Workbook(filename)
         self.worksheet = self.workbook.add_worksheet('Facility Demographics')
