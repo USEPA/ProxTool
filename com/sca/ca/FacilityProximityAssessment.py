@@ -330,14 +330,17 @@ class FacilityProximityAssessment:
             fac_gdf = fac_gdf.to_crs(epsg)
             
            
-            # Subset census DF to one latitude above and one below this facility
-            census_latband = self.censusblks_df[(self.censusblks_df['lat'] >= fac_lat-1)
-                                                & (self.censusblks_df['lat'] <= fac_lat+1)]
+            # Subset census DF to one latitude above and one below and one longitude
+            # west and east of this facility
+            census_box = self.censusblks_df[(self.censusblks_df['lat'] >= fac_lat-1)
+                                                & (self.censusblks_df['lat'] <= fac_lat+1)
+                                                & (self.censusblks_df['lon'] >= fac_lon-1)
+                                                & (self.censusblks_df['lon'] <= fac_lon+1)]
             
-            # Create geodataframe of census_latband and then convert CRS to UTM of facility
+            # Create geodataframe of census_latband and census_lonband and then convert CRS to UTM of facility
             censusblks_gdf = gpd.GeoDataFrame(
-                census_latband, geometry=gpd.points_from_xy(
-                census_latband.lon, census_latband.lat, crs='epsg:4269'))
+                census_box, geometry=gpd.points_from_xy(
+                census_box.lon, census_box.lat, crs='epsg:4269'))
             censusblks_gdf = censusblks_gdf.to_crs(epsg)
             
             censusblks_gdf['utme'] = censusblks_gdf.geometry.x
