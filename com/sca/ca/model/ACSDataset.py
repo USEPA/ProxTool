@@ -4,9 +4,10 @@ import re
 import numpy as np
 import pandas as pd
 
-from com.sca.ca.model.ExcelDataset import ExcelDataset
+# from com.sca.ca.model.ExcelDataset import ExcelDataset
+from com.sca.ca.model.CSVDataset import CSVDataset
 
-class ACSDataset(ExcelDataset):
+class ACSDataset(CSVDataset):
 
     def get_columns(self):
         return ['bkgrp', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',

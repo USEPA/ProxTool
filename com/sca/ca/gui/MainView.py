@@ -3,7 +3,6 @@ import tkinter.filedialog
 import PIL.Image
 from PIL import ImageTk
 from functools import partial
-import webbrowser
 
 from tkinter import messagebox
 
@@ -11,6 +10,7 @@ from com.sca.ca.FacilityProximityAssessment import FacilityProximityAssessment
 from com.sca.ca.gui.EntryWithPlaceHolder import EntryWithPlaceholder
 from com.sca.ca.gui.Styles import *
 from com.sca.ca.model.ACSDataset import ACSDataset
+from com.sca.ca.model.ACSCountyTract import ACSCountyTract
 from com.sca.ca.model.CensusDataset import CensusDataset
 from com.sca.ca.model.FacilityList import FacilityList
 
@@ -19,6 +19,7 @@ class MainView(tk.Frame):
     def __init__(self, master, *args, **kwargs):
         self.censusblks_df = None
         self.acs_df = None
+        self.acsCountyTract_df = None
 
         tk.Frame.__init__(self, master=master, *args, **kwargs)
 
@@ -113,26 +114,60 @@ class MainView(tk.Frame):
 
         # Load auxiliary files
         # Create censusblks dataframe
-        censusblks = CensusDataset(path="resources/us_blocks_2010.csv")
+        try:
+            censusblks = CensusDataset(path="resources/us_blocks_2010.csv")
+        except BaseException as e:
+            messagebox.showinfo("Error", "An error has occurred while trying to read the census block input file (csv format). \n" +
+                                "The error says: \n\n" + str(e))
+            self.reset_run_button()
+            return
+            
         self.censusblks_df = censusblks.dataframe
         print("Loaded census blocks")
 
         # Create acs dataframe
-        acs = ACSDataset(path="resources/acs.xlsx")
+        try:
+            acs = ACSDataset(path="resources/acs.csv")
+        except BaseException as e:
+            messagebox.showinfo("Error", "An error has occurred while trying to read the ACS data input file (csv format). \n" +
+                                "The error says: \n\n" + str(e))
+            self.reset_run_button()
+            return
+            
         self.acs_df = acs.dataframe
         print("Loaded ACS data")
 
+        # Create acs county/tract dataframe
+        try:
+            acsDefault = ACSCountyTract(path="resources/acs-levels.csv")
+        except BaseException as e:
+            messagebox.showinfo("Error", "An error has occurred while trying to read the ACS tract/county input file (csv format). \n" +
+                                "The error says: \n\n" + str(e))
+            self.reset_run_button()
+            return
+            
+        self.acsCountyTract_df = acsDefault.dataframe
+        print("Loaded ACS County/Tract data")
+
         # Create faclist dataframe
-        faclist = FacilityList(path=self.facility_list_file)
+        try:
+            faclist = FacilityList(path=self.facility_list_file)
+        except BaseException as e:
+            messagebox.showinfo("Error", "An error has occurred while trying to read the facility input file. \n" +
+                                "The error says: \n\n" + str(e))
+            self.reset_run_button()
+            return
+            
         faclist_df = faclist.dataframe
         print("Loaded facility data")
-        
+                
         assessment = FacilityProximityAssessment(filename_entry=self.filename_entry.get_text_value(),
                                                  output_dir=self.output_dir,
                                                  faclist_df=faclist_df,
                                                  radius=self.radius_num.get_text_value(),
                                                  census_df=self.censusblks_df,
-                                                 acs_df=self.acs_df)
+                                                 acs_df=self.acs_df,
+                                                 acsCountyTract_df=self.acsCountyTract_df)
     
         while True:
             try:        
@@ -140,8 +175,9 @@ class MainView(tk.Frame):
                 messagebox.showinfo("Complete", "Run complete. Check your output folder for results.")
                 self.reset_gui()
                 break
-            except:
-                messagebox.showinfo("Error", "Please check your facility list file is properly formatted.")
+            except Exception as e:
+                messagebox.showinfo("Error", "An error has been generated while trying to run the assessment Create function. \n" +
+                                    "The error says: \n" + str(e))
                 self.reset_run_button()
                 break
                 

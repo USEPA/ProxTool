@@ -14,6 +14,7 @@ from copy import deepcopy
 from decimal import ROUND_HALF_UP, Decimal, getcontext
 from math import *
 from pandas import isna
+from tkinter import messagebox
 from com.sca.ca.model.ACSDataset import ACSDataset
 from com.sca.ca.model.CensusDataset import CensusDataset
 from com.sca.ca.model.FacilityList import FacilityList
@@ -22,7 +23,8 @@ from com.sca.ca.support.UTM import *
 # Describe Demographics Within Range of Specified Facilities
 class FacilityProximityAssessment:
 
-    def __init__(self, filename_entry, output_dir, faclist_df, radius, census_df, acs_df):
+    def __init__(self, filename_entry, output_dir, faclist_df, radius, census_df, acs_df, 
+                 acsCountyTract_df):
 
         # Output path
         self.filename_entry = str(filename_entry)
@@ -30,6 +32,7 @@ class FacilityProximityAssessment:
         self.faclist_df = faclist_df
         self.censusblks_df = census_df
         self.acs_df = acs_df
+        self.acsCountyTract_df = acsCountyTract_df
         self.formats = None
         self.facility_bin = None
         self.national_bin = None
@@ -248,17 +251,20 @@ class FacilityProximityAssessment:
             self.facility_bin[1][7] += (100 - pct_age_gt64 - pct_age_lt18) * population
             self.facility_bin[0][7] += population
         if not isna(edu_universe):
-            self.facility_bin[1][9] += (edu_universe/total_pop * population) * 100
+            self.facility_bin[1][9] += edu_universe/total_pop * population
+            # self.facility_bin[1][9] += (edu_universe/total_pop * population) * 100
             self.facility_bin[0][9] += population
         if not isna(pov_universe):
             self.facility_bin[1][15] += (pov_universe/total_pop * population) * 100
             self.facility_bin[0][15] += population
         if not isna(edu_universe) and not isna(pct_edu_lths):
             self.facility_bin[1][10] += pct_edu_lths * (edu_universe/total_pop * population)
-            self.facility_bin[0][10] += edu_universe
+            self.facility_bin[0][10] += edu_universe/total_pop * population
+            # self.facility_bin[0][10] += edu_universe
         if not isna(pov_universe):
             self.facility_bin[1][11] += pct_pov * (pov_universe/total_pop * population)
-            self.facility_bin[0][11] += pov_universe
+            self.facility_bin[0][11] += population
+            # self.facility_bin[0][11] += pov_universe
         if not isna(pov_universe) and not isna(pct_lowinc):
             self.facility_bin[1][12] += pct_lowinc * (pov_universe/total_pop * population)
             self.facility_bin[0][12] += pov_universe
@@ -307,10 +313,11 @@ class FacilityProximityAssessment:
             self.national_bin, self.worksheet, self.formats, start_row) + 1
 
 
+        # Process each facility
         for index, row in self.faclist_df.iterrows():
             
             print('Calculating distances for ' + self.faclist_df['facility_id'][index])
-            
+                            
             self.facility_bin = [[0]*16 for _ in range(2)]
             
             fac_lat = row['lat']
@@ -329,7 +336,6 @@ class FacilityProximityAssessment:
                 fac_df.lon, fac_df.lat, crs='epsg:4269'))
             fac_gdf = fac_gdf.to_crs(epsg)
             
-           
             # Subset census DF to one latitude above and one below and one longitude
             # west and east of this facility
             census_box = self.censusblks_df[(self.censusblks_df['lat'] >= fac_lat-1)
@@ -360,41 +366,76 @@ class FacilityProximityAssessment:
 
             blksinrange_gdf['bkgrp'] = blksinrange_gdf['blkid'].astype(str).str[:12]
                         
-            # Merge with ACS
-            # Note: Current merge only picks up numeric census blk ids, some blkids have other
-            # characters not caught in ACS file.
-            acsinrange_gdf = blksinrange_gdf.merge(
-                self.acs_df.astype({'bkgrp': 'str'}), left_on='bkgrp', right_on='bkgrp')
+            # Merge with ACS blockgroup data
+            # Note: Not all blockgroups in blksinrange_gdf will be in the ACS blockgroup data
+            commonACS_gdf = blksinrange_gdf.merge(
+                self.acs_df.astype({'bkgrp': 'str'}), how='inner', left_on='bkgrp', right_on='bkgrp')
+
+            # Identify any census blockgroups that are not in the ACS blockgroup data
+            missing_gdf = blksinrange_gdf[(~blksinrange_gdf.bkgrp.isin(commonACS_gdf.bkgrp))].copy()
             
+            if len(missing_gdf) == 0:
+                acsinrange_gdf = commonACS_gdf
+                
+            else:
+                # First try to default missing blockgroups to tracts
+                missing_gdf['tract'] = missing_gdf['bkgrp'].str[:11]
+                missing_w_tract = missing_gdf.merge(
+                    self.acsCountyTract_df, how='inner', left_on='tract', right_on='ID')
+                
+                # Next, consider counties
+                if (len(commonACS_gdf) + len(missing_w_tract)) != len(blksinrange_gdf):
+                    missing_gdf['county'] = missing_gdf['bkgrp'].str[:5]
+                    stillmissing_gdf = missing_gdf[(~missing_gdf.tract.isin(self.acsCountyTract_df))]
+                    missing_w_county = stillmissing_gdf.merge(
+                        self.acsCountyTract_df, how='inner', left_on='county', right_on='ID')
+                
+                    if (len(commonACS_gdf) + len(missing_w_tract) + len(missing_w_county)) != len(blksinrange_gdf):
+                        messagebox.showinfo("Error", "There are some census blocks that could not be matched to " +
+                                            "ACS blockgroup or default data.")
+                        return
+                    else:
+                        acsinrange_gdf = commonACS_gdf.append(missing_w_tract, ignore_index=True)
+                else:
+                    acsinrange_gdf = commonACS_gdf.append([missing_w_tract,missing_w_county], ignore_index=True)
+                    
+                        
             acs_columns = ['population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
                            'pnh_am_ind', 'pnh_othmix', 'pt_hisp', 'p_agelt18', 'p_agegt64',
                            'p_2xpov', 'p_pov', 'age_25up', 'p_edulths', 'p_lingiso',
                            'age_univ', 'pov_univ', 'edu_univ', 'iso_univ', 'pov_fl', 'iso_fl']
             acsinrange_df = pd.DataFrame(acsinrange_gdf, columns=acs_columns)
+
         
             # Create facility bin and tabulate population weighted demographic stats for each sub
             # group.
             acsinrange_df.apply(lambda row: self.tabulate_facility_data(row), axis=1)
-                    
+                        
             # Calculate averages by dividing population for each sub group
             for col_index in range(1, 16):
-                if col_index == 11:
-                    if (100 * self.facility_bin[0][col_index]) == 0:
-                        self.facility_bin[1][col_index] = 0
-                    else:
-                        self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][0])
+                if (self.facility_bin[0][col_index]) == 0:
+                    self.facility_bin[1][col_index] = 0
                 else:
-                    if (100 * self.facility_bin[0][col_index]) == 0:
-                        self.facility_bin[1][col_index] = 0
-                    else:
-                        self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][col_index])
+                    self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][col_index])
+                # if col_index == 11:
+                #     if (100 * self.facility_bin[0][0]) == 0:
+                #         self.facility_bin[1][col_index] = 0
+                #     else:
+                #         self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][0])
+                # else:
+                #     if (100 * self.facility_bin[0][col_index]) == 0:
+                #         self.facility_bin[1][col_index] = 0
+                #     else:
+                #         self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][col_index])
         
+            # Compute people counts
             self.facility_bin[0][15] = self.facility_bin[0][0] * self.facility_bin[1][15]
             for col_index in range(1, 15):
-                if col_index == 10:
-                    self.facility_bin[0][col_index] = self.facility_bin[0][9] * self.facility_bin[1][col_index]
-                else:
-                    self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
+                self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
+                # if col_index == 10:
+                #     self.facility_bin[0][col_index] = self.facility_bin[0][10] * self.facility_bin[1][col_index]
+                # else:
+                #     self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
         
             self.facility_bin[1][0] = ""
 
