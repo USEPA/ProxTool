@@ -38,11 +38,13 @@ class ExcelDataset:
                         custom_msg = "Length Mismatch: Input file has " + result.group(1) + " columns, but should have " + \
                                      result.group(2) + " columns. Please make sure you have selected the correct file or file version."
                         print("Error uploading input file: " + custom_msg)
+                        
                     else:
                         print("Error uploading input file: " + str(e) + " Please make sure you have selected the correct file or file version.")
+                        
                 else:
                     print("Error uploading input file: " + str(e) + " Please make sure you have selected the correct file or file version.")
-
+                    
             else:
                 df = df.astype(str).applymap(self.convertEmptyToNaN)
                 types = self.get_column_types()
