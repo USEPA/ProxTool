@@ -4,7 +4,11 @@ Created on Wed Jul 21 14:06:32 2021
 
 @author: CCook
 """
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 import os
+from pyproj import _datadir, datadir
+from fiona import _shim, schema
 import pandas as pd
 import geopandas as gpd
 import numpy as np
@@ -19,6 +23,7 @@ from com.sca.ca.model.ACSDataset import ACSDataset
 from com.sca.ca.model.CensusDataset import CensusDataset
 from com.sca.ca.model.FacilityList import FacilityList
 from com.sca.ca.support.UTM import *
+
 
 # Describe Demographics Within Range of Specified Facilities
 class FacilityProximityAssessment:
@@ -36,6 +41,9 @@ class FacilityProximityAssessment:
         self.formats = None
         self.facility_bin = None
         self.national_bin = None
+        
+        # Initialize set to hold missing blockgroups
+        self.missingbkgrps = set()
 
         # Specify range in km
         self.radius = int(radius)
@@ -279,6 +287,16 @@ class FacilityProximityAssessment:
         self.create_workbook()
         self.calculate_distances()
         self.close_workbook()
+        
+        # Write out any missing blockgroups
+        if len(self.missingbkgrps) > 0:
+            missfname = self.filename_entry + '_' + 'missing_block_groups.txt'
+            misspath = os.path.join(self.fullpath, missfname)
+            
+            with open(misspath, 'w') as f:
+                for item in self.missingbkgrps:
+                    f.write("%s\n" % item)
+            
 
     # Distance calculation
     # This utilizes geopandas rather than the query function used in HEM4
@@ -316,7 +334,7 @@ class FacilityProximityAssessment:
         # Process each facility
         for index, row in self.faclist_df.iterrows():
             
-            print('Calculating distances for ' + self.faclist_df['facility_id'][index])
+            print('Calculating proximity for facility: ' + self.faclist_df['facility_id'][index])
                             
             self.facility_bin = [[0]*16 for _ in range(2)]
             
@@ -378,6 +396,10 @@ class FacilityProximityAssessment:
                 acsinrange_gdf = commonACS_gdf
                 
             else:
+                # Add these missing blockgroups to the missing set
+                missbkgrp = missing_gdf['bkgrp'].tolist()
+                self.missingbkgrps.update(missbkgrp)
+                
                 # First try to default missing blockgroups to tracts
                 missing_gdf['tract'] = missing_gdf['bkgrp'].str[:11]
                 missing_w_tract = missing_gdf.merge(
