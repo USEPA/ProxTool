@@ -88,7 +88,7 @@ class FacilityProximityAssessment:
             'valign': 'vcenter'})
 
         formats['notes'] = workbook.add_format({
-            'font_size': 12,
+            'font_size': 11,
             'bold': 0,
             'align': 'left',
             'valign': 'top',
@@ -259,8 +259,7 @@ class FacilityProximityAssessment:
             self.facility_bin[1][7] += (100 - pct_age_gt64 - pct_age_lt18) * population
             self.facility_bin[0][7] += population
         if not isna(edu_universe):
-            self.facility_bin[1][9] += edu_universe/total_pop * population
-            # self.facility_bin[1][9] += (edu_universe/total_pop * population) * 100
+            self.facility_bin[1][9] += (edu_universe/total_pop * population) * 100
             self.facility_bin[0][9] += population
         if not isna(pov_universe):
             self.facility_bin[1][15] += (pov_universe/total_pop * population) * 100
@@ -345,7 +344,7 @@ class FacilityProximityAssessment:
 
             # Convert this facility's lat/lon to UTM
             fac_utmn, fac_utme, fac_utmz, hemi, epsg = UTM.ll2utm(fac_lat, fac_lon)
-            
+                        
             # Create geodataframe of this one facility
             latlon = [[fac_lat, fac_lon]]
             fac_df = pd.DataFrame(latlon, columns=['lat', 'lon'])
@@ -373,10 +372,10 @@ class FacilityProximityAssessment:
             # Compute distance between blocks and facility (in meters)
             censusblks_gdf['dist_m'] = censusblks_gdf.apply(lambda row: np.sqrt((fac_utme - row['utme'])**2 +
                                         (fac_utmn - row['utmn'])**2), axis=1)
-            
+                        
             # Subset to user defined radius
             blksinrange_gdf = censusblks_gdf[censusblks_gdf['dist_m'] <= self.radius*1000]
-
+            
             # Remove blocks corresponding to schools, monitors, etc.
             blksinrange_gdf = blksinrange_gdf.loc[
                 (~blksinrange_gdf['blkid'].str.contains('S')) &
@@ -408,18 +407,17 @@ class FacilityProximityAssessment:
                 # Next, consider counties
                 if (len(commonACS_gdf) + len(missing_w_tract)) != len(blksinrange_gdf):
                     missing_gdf['county'] = missing_gdf['bkgrp'].str[:5]
-                    stillmissing_gdf = missing_gdf[(~missing_gdf.tract.isin(self.acsCountyTract_df))]
+                    stillmissing_gdf = missing_gdf[(~missing_gdf.tract.isin(self.acsCountyTract_df.ID))]
                     missing_w_county = stillmissing_gdf.merge(
                         self.acsCountyTract_df, how='inner', left_on='county', right_on='ID')
                 
                     if (len(commonACS_gdf) + len(missing_w_tract) + len(missing_w_county)) != len(blksinrange_gdf):
-                        messagebox.showinfo("Error", "There are some census blocks that could not be matched to " +
-                                            "ACS blockgroup or default data.")
-                        return
-                    else:
-                        acsinrange_gdf = commonACS_gdf.append(missing_w_tract, ignore_index=True)
-                else:
+                        completelymissing_gdf = stillmissing_gdf[(~stillmissing_gdf.county.isin(self.acsCountyTract_df.ID))]
+                        messagebox.showinfo("Warning", "There are some census blocks that could not be matched to " +
+                                            "ACS blockgroup or ACS default data.")
                     acsinrange_gdf = commonACS_gdf.append([missing_w_tract,missing_w_county], ignore_index=True)
+                else:
+                    acsinrange_gdf = commonACS_gdf.append(missing_w_tract, ignore_index=True)
                     
                         
             acs_columns = ['population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
@@ -432,6 +430,7 @@ class FacilityProximityAssessment:
             # Create facility bin and tabulate population weighted demographic stats for each sub
             # group.
             acsinrange_df.apply(lambda row: self.tabulate_facility_data(row), axis=1)
+
                         
             # Calculate averages by dividing population for each sub group
             for col_index in range(1, 16):
@@ -449,15 +448,15 @@ class FacilityProximityAssessment:
                 #         self.facility_bin[1][col_index] = 0
                 #     else:
                 #         self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][col_index])
-        
+                    
             # Compute people counts
             self.facility_bin[0][15] = self.facility_bin[0][0] * self.facility_bin[1][15]
             for col_index in range(1, 15):
-                self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
-                # if col_index == 10:
-                #     self.facility_bin[0][col_index] = self.facility_bin[0][10] * self.facility_bin[1][col_index]
-                # else:
-                #     self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
+                # self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
+                if col_index == 10:
+                    self.facility_bin[0][col_index] = self.facility_bin[0][10] * self.facility_bin[1][col_index]
+                else:
+                    self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
         
             self.facility_bin[1][0] = ""
 
@@ -479,8 +478,8 @@ class FacilityProximityAssessment:
         self.worksheet = self.workbook.add_worksheet('Facility Demographics')
         self.formats = self.create_formats(self.workbook)
 
-        column_headers = ['Total Population', 'White', 'Minority\u1D9C', 'African American',
-                          'Native American', 'Other and Multiracial', 'Hispanic or Latino\u1D48',
+        column_headers = ['Total Population', 'White', 'Minority', 'African American',
+                          'Native American', 'Other and Multiracial', 'Hispanic or Latino',
                           'Age (Years)\n0-17', 'Age (Years)\n18-64', 'Age (Years)\n>=65',
                           'People Living Below the Poverty Level', 'Total Number >= 25 Years Old',
                           'Number >= 25 Years Old without a High School Diploma',
@@ -499,19 +498,19 @@ class FacilityProximityAssessment:
 
         # Create column headers
         self.worksheet.merge_range("A2:A3", 'Population Basis', self.formats['sub_header_2'])
-        self.worksheet.merge_range("A4:A5", 'Nationwide', self.formats['sub_header_2'])
+        self.worksheet.merge_range("A4:A5", 'Nationwide', self.formats['sub_header_3'])
         self.worksheet.merge_range("B2:N2", 'Demographic Group',  self.formats['sub_header_3'])
 
         self.worksheet.set_row(2, 72, self.formats['sub_header_2'])
         for col_num, data in enumerate(column_headers):
             self.worksheet.write(2, col_num+1, data)
 
-        col = 'B'
-        for header in column_headers:
-            header_coords = col+'4:'+col+'5'
-            self.worksheet.merge_range(header_coords, header, self.formats['sub_header_3'])
-            self.worksheet.set_column(top_header_coords, 12)
-            col = chr(ord(col) + 1)
+        # col = 'B'
+        # for header in column_headers:
+        #     header_coords = col+'4:'+col+'5'
+        #     self.worksheet.merge_range(header_coords, header, self.formats['sub_header_3'])
+        #     self.worksheet.set_column(top_header_coords, 12)
+        #     col = chr(ord(col) + 1)
 
         # Add Facility Names
         facname_list = self.faclist_df['facility_id'].tolist()
@@ -524,21 +523,24 @@ class FacilityProximityAssessment:
 
         # Create notes
         first_notes_row = last_data_row + 1
-        last_notes_row = first_notes_row + 4
+        # last_notes_row = first_notes_row + 4
         firstcol = 'A'
         lastcol = chr(ord(firstcol) + len(column_headers))
-        notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(last_notes_row)
-        self.worksheet.merge_range(notes_coords, 'Notes:\n\n' + \
-          '\u1D43Total nationwide population includes all 50 states plus Puerto Rico. ' + \
-          '\nDistributions by race, ethnicity, age, education, income and linguistic isolation are based on ' + \
-          'demographic information at the census block group level.\n' + \
-          '\u1D9CThe minority population includes people identifying as African American, Native American, Other ' + \
+        notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(first_notes_row)
+        # notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(last_notes_row)
+        self.worksheet.merge_range(notes_coords, 'Notes:\n' + \
+          '* Total nationwide population includes all 50 states plus Puerto Rico.\n' + \
+          '* Distributions by race, ethnicity, age, education, income and linguistic isolation are based on ' + \
+          "demographic information at the census block group level, provided by the Census' American Community Survey (ACS) 5-year averages. Demographic percentages based on different averages may differ.\n" + \
+          '* The minority population includes people identifying as African American, Native American, Other ' + \
           'and Multiracial, or Hispanic/Latino. Measures are taken to avoid double counting of people identifying ' + \
-          'as both Hispanic/Latino and a racial minority.\n' + \
-          '\u1D48In order to avoid double counting, the "Hispanic or Latino" category is treated as a distinct ' + \
+          'as both Hispanic/Latino and a racial minority. ' + \
+          'In order to avoid double counting, the "Hispanic or Latino" category is treated as a distinct ' + \
           'demographic category for these analyses. A person is identified as one of five racial/ethnic ' + \
-          'categories above: White, African American, Native American, Other and Multiracial, or Hispanic/Latino.\n' + \
-          '\u1D49The population-weighted average risk takes into account risk levels at all. ',  self.formats['notes'])
+          'categories above: White, African American, Native American, Other and Multiracial, or Hispanic/Latino.\n' \
+          ,  self.formats['notes'])
+
+        self.worksheet.set_row(first_notes_row-1, 120)
 
     def close_workbook(self):
         self.workbook.close()
