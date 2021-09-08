@@ -48,8 +48,7 @@ class FacilityProximityAssessment:
         # Specify range in km
         self.radius = int(radius)
 
-        # Not GUI-related, but will need to be specified? Uncertain as to the implementation
-        # of active_columns?
+        # Identify the relevant column indexes from the national and facility bins
         self.active_columns = [0, 1, 14, 2, 3, 4, 5, 6, 7, 8, 11, 9, 10, 13]
 
     def create_formats(self, workbook):
@@ -289,7 +288,7 @@ class FacilityProximityAssessment:
         
         # Write out any missing blockgroups
         if len(self.missingbkgrps) > 0:
-            missfname = self.filename_entry + '_' + 'missing_block_groups.txt'
+            missfname = self.filename_entry + '_' + 'missing_block_groups' + '_' + str(self.radius) + 'km.txt'
             misspath = os.path.join(self.fullpath, missfname)
             
             with open(misspath, 'w') as f:
@@ -305,7 +304,9 @@ class FacilityProximityAssessment:
     # Still need to develop a way to keep distances linked to facilities for bin creation and output
     def calculate_distances(self):
 
+        # Initialize starting data rows for the facility and sortable sheets
         start_row = 3
+        sort_row = 1
 
         # Create national bin and tabulate population weighted demographic stats for each sub group.
         self.national_bin = [[0]*16 for _ in range(2)]
@@ -326,8 +327,10 @@ class FacilityProximityAssessment:
                 self.national_bin[0][index] = self.national_bin[0][0] * self.national_bin[1][index]
 
         self.national_bin[1][0] = ""
+        
+        # Write to facility sheet
         start_row = self.append_aggregated_data(
-            self.national_bin, self.worksheet, self.formats, start_row) + 1
+            self.national_bin, self.worksheet_facility, self.formats, start_row) + 1
 
 
         # Process each facility
@@ -438,16 +441,6 @@ class FacilityProximityAssessment:
                     self.facility_bin[1][col_index] = 0
                 else:
                     self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][col_index])
-                # if col_index == 11:
-                #     if (100 * self.facility_bin[0][0]) == 0:
-                #         self.facility_bin[1][col_index] = 0
-                #     else:
-                #         self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][0])
-                # else:
-                #     if (100 * self.facility_bin[0][col_index]) == 0:
-                #         self.facility_bin[1][col_index] = 0
-                #     else:
-                #         self.facility_bin[1][col_index] = self.facility_bin[1][col_index] / (100 * self.facility_bin[0][col_index])
                     
             # Compute people counts
             self.facility_bin[0][15] = self.facility_bin[0][0] * self.facility_bin[1][15]
@@ -460,8 +453,20 @@ class FacilityProximityAssessment:
         
             self.facility_bin[1][0] = ""
 
+            # Write to facility sheet
             start_row = self.append_aggregated_data(
-                self.facility_bin, self.worksheet, self.formats, start_row)
+                self.facility_bin, self.worksheet_facility, self.formats, start_row)
+            
+            # Write to sortable sheet
+            sort_bin = self.facility_bin[1]
+            sort_bin[0] = self.facility_bin[0][0]
+            col_idx = np.array(self.active_columns)
+            slice = np.array(sort_bin)[col_idx]
+            
+            for col_num, data in enumerate(slice):
+                format = self.formats['percentage'] if data <= 1 else self.formats['number']
+                self.worksheet_sort.write_number(sort_row, col_num+3, data, format)
+            sort_row = sort_row + 1
 
     # Create Workbook
     # Final workbook should have similar formatting as ej tables, with two rows for nationwide
@@ -473,11 +478,15 @@ class FacilityProximityAssessment:
         if not (os.path.exists(output_dir) or os.path.isdir(output_dir)):
             os.mkdir(output_dir)
         filename = os.path.join(output_dir, self.filename_entry + '.xlsx')
-        tablename = 'Population Demographics within ' + str(self.radius) + ' km of Source Facilities'
         self.workbook = xlsxwriter.Workbook(filename)
-        self.worksheet = self.workbook.add_worksheet('Facility Demographics')
+        self.worksheet_facility = self.workbook.add_worksheet('Facility Demographics')
+        self.worksheet_sort = self.workbook.add_worksheet('Sortable %')
         self.formats = self.create_formats(self.workbook)
 
+        #------------ Facility Spreadsheet ----------------------------------------------
+
+        tablename = 'Population Demographics within ' + str(self.radius) + ' km of Source Facilities'
+        
         column_headers = ['Total Population', 'White', 'Minority', 'African American',
                           'Native American', 'Other and Multiracial', 'Hispanic or Latino',
                           'Age (Years)\n0-17', 'Age (Years)\n18-64', 'Age (Years)\n>=65',
@@ -490,33 +499,26 @@ class FacilityProximityAssessment:
         top_header_coords = firstcol+'1:'+lastcol+'1'
 
         # Increase the cell size of the merged cells to highlight the formatting.
-        self.worksheet.set_column(top_header_coords, 12)
-        self.worksheet.set_row(0, 30)
+        self.worksheet_facility.set_column(top_header_coords, 12)
+        self.worksheet_facility.set_row(0, 30)
 
         # Create top level header
-        self.worksheet.merge_range(top_header_coords, tablename, self.formats['top_header'])
+        self.worksheet_facility.merge_range(top_header_coords, tablename, self.formats['top_header'])
 
         # Create column headers
-        self.worksheet.merge_range("A2:A3", 'Population Basis', self.formats['sub_header_2'])
-        self.worksheet.merge_range("A4:A5", 'Nationwide', self.formats['sub_header_3'])
-        self.worksheet.merge_range("B2:N2", 'Demographic Group',  self.formats['sub_header_3'])
+        self.worksheet_facility.merge_range("A2:A3", 'Population Basis', self.formats['sub_header_2'])
+        self.worksheet_facility.merge_range("A4:A5", 'Nationwide', self.formats['sub_header_3'])
+        self.worksheet_facility.merge_range("B2:N2", 'Demographic Group',  self.formats['sub_header_3'])
 
-        self.worksheet.set_row(2, 72, self.formats['sub_header_2'])
+        self.worksheet_facility.set_row(2, 72, self.formats['sub_header_2'])
         for col_num, data in enumerate(column_headers):
-            self.worksheet.write(2, col_num+1, data)
-
-        # col = 'B'
-        # for header in column_headers:
-        #     header_coords = col+'4:'+col+'5'
-        #     self.worksheet.merge_range(header_coords, header, self.formats['sub_header_3'])
-        #     self.worksheet.set_column(top_header_coords, 12)
-        #     col = chr(ord(col) + 1)
+            self.worksheet_facility.write(2, col_num+1, data)
 
         # Add Facility Names
         facname_list = self.faclist_df['facility_id'].tolist()
         row_num = 6
         for index, data in enumerate(facname_list):
-            self.worksheet.merge_range(row_num, 0, row_num + 1, 0, data, self.formats['sub_header_3'])
+            self.worksheet_facility.merge_range(row_num, 0, row_num + 1, 0, data, self.formats['sub_header_3'])
             row_num = row_num + 2
 
         last_data_row = 2 * len(facname_list) + 10
@@ -528,7 +530,7 @@ class FacilityProximityAssessment:
         lastcol = chr(ord(firstcol) + len(column_headers))
         notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(first_notes_row)
         # notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(last_notes_row)
-        self.worksheet.merge_range(notes_coords, 'Notes:\n' + \
+        self.worksheet_facility.merge_range(notes_coords, 'Notes:\n' + \
           '* Total nationwide population includes all 50 states plus Puerto Rico.\n' + \
           '* Distributions by race, ethnicity, age, education, income and linguistic isolation are based on ' + \
           "demographic information at the census block group level, provided by the Census' American Community Survey (ACS) 5-year averages. Demographic percentages based on different averages may differ.\n" + \
@@ -540,7 +542,40 @@ class FacilityProximityAssessment:
           'categories above: White, African American, Native American, Other and Multiracial, or Hispanic/Latino.\n' \
           ,  self.formats['notes'])
 
-        self.worksheet.set_row(first_notes_row-1, 120)
+        self.worksheet_facility.set_row(first_notes_row-1, 120)
 
+
+        #------------ Sortable Spreadsheet ----------------------------------------------
+
+        sort_headers = ['Facility ID', 'Longitude', 'Latitude', 'Total Population', 'White', 
+                          'Minority', 'African American',
+                          'Native American', 'Other and Multiracial', 'Hispanic or Latino',
+                          'Age (Years)\n0-17', 'Age (Years)\n18-64', 'Age (Years)\n>=65',
+                          'People Living Below the Poverty Level', 'Total Number >= 25 Years Old',
+                          'Number >= 25 Years Old without a High School Diploma',
+                          'People Living in Linguistic Isolation']
+        
+        firstcol = 'A'
+        lastcol = chr(ord(firstcol) + len(sort_headers))
+        top_header_coords = firstcol+'1:'+lastcol+'1'
+
+        # Increase the column width.
+        self.worksheet_sort.set_column(top_header_coords, 12)
+              
+        # Create column headers
+        self.worksheet_sort.set_row(0, 72, self.formats['sub_header_2'])
+        for col_num, data in enumerate(sort_headers):
+            self.worksheet_sort.write(0, col_num, data)
+        
+        # Add Facility ID, Lat, Lon
+        facname_list = self.faclist_df['facility_id'].tolist()
+        row_num = 1
+        for index, row in self.faclist_df.iterrows():
+            self.worksheet_sort.write_string(row_num, 0, row['facility_id'], self.formats['sub_header_3'])
+            self.worksheet_sort.write_number(row_num, 1, row['lon'], self.formats['sub_header_3'])
+            self.worksheet_sort.write_number(row_num, 2, row['lat'], self.formats['sub_header_3'])
+            row_num = row_num + 1
+                
+        
     def close_workbook(self):
         self.workbook.close()
