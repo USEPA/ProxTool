@@ -405,6 +405,7 @@ class FacilityProximityAssessment:
         acsinrange_total_df = pd.DataFrame()
         
         # Process each facility
+        facility_list_length = len(self.faclist_df)
         for index, row in self.faclist_df.iterrows():
             
             print('Calculating proximity for facility: ' + self.faclist_df['facility_id'][index])
@@ -487,8 +488,8 @@ class FacilityProximityAssessment:
                 
                     if (len(commonACS_gdf) + len(missing_w_tract) + len(missing_w_county)) != len(blksinrange_gdf):
                         completelymissing_gdf = stillmissing_gdf[(~stillmissing_gdf.county.isin(self.acsCountyTract_df.ID))]
-                        messagebox.showinfo("Warning", "There are some census blocks that could not be matched to " +
-                                            "ACS blockgroup or ACS default data.")
+                        # messagebox.showinfo("Warning", "There are some census blocks that could not be matched to " +
+                        #                     "ACS blockgroup or ACS default data.")
                     acsinrange_gdf = commonACS_gdf.append([missing_w_tract,missing_w_county], ignore_index=True)
                 else:
                     acsinrange_gdf = commonACS_gdf.append(missing_w_tract, ignore_index=True)
@@ -498,6 +499,8 @@ class FacilityProximityAssessment:
                 acsinrange_total_df = acsinrange_gdf
             else:
                 acsinrange_total_df = pd.concat([acsinrange_total_df, acsinrange_gdf])
+                acsinrange_total_df = acsinrange_total_df.drop_duplicates(
+                    subset='blkid', keep='last').reset_index(drop=True)
 
             acs_columns = ['population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
                            'pnh_am_ind', 'pnh_othmix', 'pt_hisp', 'p_agelt18', 'p_agegt64',
