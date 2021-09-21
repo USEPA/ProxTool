@@ -43,8 +43,8 @@ class FacilityProximityAssessment:
         self.national_bin = None
         self.rungroup_bin = None
         
-        # Initialize dictionary of block id's for the rungroup
-        self.blocks = {}
+        # Initialize list of used blocks
+        self.used_blocks = []
         
         # Initialize set to hold missing blockgroups
         self.missingbkgrps = set()
@@ -129,7 +129,7 @@ class FacilityProximityAssessment:
         rounded = round(d, sig-int(floor(log10(abs(x))))-1)
         rounded = float(rounded)
         return rounded
-
+    
     def append_aggregated_data(self, values, worksheet, formats, startrow):
 
         data = deepcopy(values)
@@ -156,217 +156,55 @@ class FacilityProximityAssessment:
 
         return startrow + numrows
 
-    def tabulate_national_data(self, row):
-
-        population = row['totalpop']
-        pct_minority = row['p_minority']
-        pct_white = row['pnh_white']
-        pct_black = row['pnh_afr_am']
-        pct_amerind = row['pnh_am_ind']
-        pct_other = row['pnh_othmix']
-        pct_hisp = row['pt_hisp']
-        pct_age_lt18 = row['p_agelt18']
-        pct_age_gt64 = row['p_agegt64']
-        edu_universe = row['edu_univ']
-        pct_edu_lths = row['p_edulths']
-        pov_universe = row['pov_univ']
-        pct_lowinc = row['p_2xpov']
-        pct_lingiso = row['p_lingiso']
-        pct_pov = row['p_pov']
-
-        self.national_bin[0][0] += population
-        if not isna(pct_minority):
-            self.national_bin[1][1] += pct_white * population
-            self.national_bin[0][1] += population
-        if not isna(pct_black):
-            self.national_bin[1][2] += pct_black * population
-            self.national_bin[0][2] += population
-        if not isna((pct_amerind)):
-            self.national_bin[1][3] += pct_amerind * population
-            self.national_bin[0][3] += population
-        if not isna(pct_other):
-            self.national_bin[1][4] += pct_other * population
-            self.national_bin[0][4] += population
-        if not isna(pct_hisp):
-            self.national_bin[1][5] += pct_hisp * population
-            self.national_bin[0][5] += population
-        if not isna(pct_age_lt18):
-            self.national_bin[1][6] += pct_age_lt18 * population
-            self.national_bin[0][6] += population
-        if not isna(pct_age_gt64):
-            self.national_bin[1][8] += pct_age_gt64 * population
-            self.national_bin[0][8] += population
-        if not isna(pct_age_lt18) and not isna(pct_age_gt64):
-            self.national_bin[1][7] += (100 - pct_age_gt64 - pct_age_lt18) * population
-            self.national_bin[0][7] += population
-        if not isna(edu_universe):
-            self.national_bin[1][9] += edu_universe * 100
-            self.national_bin[0][9] += population
-        if not isna(pov_universe):
-            self.national_bin[1][15] += pov_universe * 100
-            self.national_bin[0][15] += population
-        if not isna(edu_universe) and not isna(pct_edu_lths):
-            self.national_bin[1][10] += pct_edu_lths * edu_universe
-            self.national_bin[0][10] += edu_universe
-        if not isna(pov_universe):
-            self.national_bin[1][11] += pct_pov * pov_universe
-            self.national_bin[0][11] += pov_universe
-        if not isna(pov_universe) and not isna(pct_lowinc):
-            self.national_bin[1][12] += pct_lowinc * pov_universe
-            self.national_bin[0][12] += pov_universe
-        if not isna(pct_lingiso):
-            self.national_bin[1][13] += pct_lingiso * population
-            self.national_bin[0][13] += population
-        if not isna(pct_minority):
-            self.national_bin[1][14] += pct_minority * population
-            self.national_bin[0][14] += population
-
-    def tabulate_facility_data(self, row):
-
-        population = row['population']
-        pct_minority = row['p_minority']
-        pct_white = row['pnh_white']
-        pct_black = row['pnh_afr_am']
-        pct_amerind = row['pnh_am_ind']
-        pct_other = row['pnh_othmix']
-        pct_hisp = row['pt_hisp']
-        pct_age_lt18 = row['p_agelt18']
-        pct_age_gt64 = row['p_agegt64']
-        edu_universe = row['edu_univ']
-        pct_edu_lths = row['p_edulths']
-        pov_universe = row['pov_univ']
-        pct_lowinc = row['p_2xpov']
-        pct_lingiso = row['p_lingiso']
-        pct_pov = row['p_pov']
-        total_pop = row['totalpop']
-
-        self.facility_bin[0][0] += population
-        if not isna(pct_minority):
-            self.facility_bin[1][1] += pct_white * population
-            self.facility_bin[0][1] += population
-        if not isna(pct_black):
-            self.facility_bin[1][2] += pct_black * population
-            self.facility_bin[0][2] += population
-        if not isna((pct_amerind)):
-            self.facility_bin[1][3] += pct_amerind * population
-            self.facility_bin[0][3] += population
-        if not isna(pct_other):
-            self.facility_bin[1][4] += pct_other * population
-            self.facility_bin[0][4] += population
-        if not isna(pct_hisp):
-            self.facility_bin[1][5] += pct_hisp * population
-            self.facility_bin[0][5] += population
-        if not isna(pct_age_lt18):
-            self.facility_bin[1][6] += pct_age_lt18 * population
-            self.facility_bin[0][6] += population
-        if not isna(pct_age_gt64):
-            self.facility_bin[1][8] += pct_age_gt64 * population
-            self.facility_bin[0][8] += population
-        if not isna(pct_age_lt18) and not isna(pct_age_gt64):
-            self.facility_bin[1][7] += (100 - pct_age_gt64 - pct_age_lt18) * population
-            self.facility_bin[0][7] += population
-        if not isna(edu_universe):
-            self.facility_bin[1][9] += (edu_universe/total_pop * population) * 100
-            self.facility_bin[0][9] += population
-        if not isna(pov_universe):
-            self.facility_bin[1][15] += (pov_universe/total_pop * population) * 100
-            self.facility_bin[0][15] += population
-        if not isna(edu_universe) and not isna(pct_edu_lths):
-            self.facility_bin[1][10] += pct_edu_lths * (edu_universe/total_pop * population)
-            self.facility_bin[0][10] += edu_universe/total_pop * population
-            # self.facility_bin[0][10] += edu_universe
-        if not isna(pov_universe):
-            self.facility_bin[1][11] += pct_pov * (pov_universe/total_pop * population)
-            self.facility_bin[0][11] += population
-            # self.facility_bin[0][11] += pov_universe
-        if not isna(pov_universe) and not isna(pct_lowinc):
-            self.facility_bin[1][12] += pct_lowinc * (pov_universe/total_pop * population)
-            self.facility_bin[0][12] += pov_universe
-        if not isna(pct_lingiso):
-            self.facility_bin[1][13] += pct_lingiso * population
-            self.facility_bin[0][13] += population
-        if not isna(pct_minority):
-            self.facility_bin[1][14] += pct_minority * population
-            self.facility_bin[0][14] += population
-
-    def tabulate_rungroup_data(self, row):
-        
-        # Has this block been processed before?
-        if row['blkid'] not in self.blocks:
-            
-            self.blocks[row['blkid']] = True
-
-            population = row['population']
-            pct_minority = row['p_minority']
-            pct_white = row['pnh_white']
-            pct_black = row['pnh_afr_am']
-            pct_amerind = row['pnh_am_ind']
-            pct_other = row['pnh_othmix']
-            pct_hisp = row['pt_hisp']
-            pct_age_lt18 = row['p_agelt18']
-            pct_age_gt64 = row['p_agegt64']
-            edu_universe = row['edu_univ']
-            pct_edu_lths = row['p_edulths']
-            pov_universe = row['pov_univ']
-            pct_lowinc = row['p_2xpov']
-            pct_lingiso = row['p_lingiso']
-            pct_pov = row['p_pov']
-            total_pop = row['totalpop']
     
-            self.rungroup_bin[0][0] += population
-            if not isna(pct_minority):
-                self.rungroup_bin[1][1] += pct_white * population
-                self.rungroup_bin[0][1] += population
-            if not isna(pct_black):
-                self.rungroup_bin[1][2] += pct_black * population
-                self.rungroup_bin[0][2] += population
-            if not isna((pct_amerind)):
-                self.rungroup_bin[1][3] += pct_amerind * population
-                self.rungroup_bin[0][3] += population
-            if not isna(pct_other):
-                self.rungroup_bin[1][4] += pct_other * population
-                self.rungroup_bin[0][4] += population
-            if not isna(pct_hisp):
-                self.rungroup_bin[1][5] += pct_hisp * population
-                self.rungroup_bin[0][5] += population
-            if not isna(pct_age_lt18):
-                self.rungroup_bin[1][6] += pct_age_lt18 * population
-                self.rungroup_bin[0][6] += population
-            if not isna(pct_age_gt64):
-                self.rungroup_bin[1][8] += pct_age_gt64 * population
-                self.rungroup_bin[0][8] += population
-            if not isna(pct_age_lt18) and not isna(pct_age_gt64):
-                self.rungroup_bin[1][7] += (100 - pct_age_gt64 - pct_age_lt18) * population
-                self.rungroup_bin[0][7] += population
-            if not isna(edu_universe):
-                self.rungroup_bin[1][9] += (edu_universe/total_pop * population) * 100
-                self.rungroup_bin[0][9] += population
-            if not isna(pov_universe):
-                self.rungroup_bin[1][15] += (pov_universe/total_pop * population) * 100
-                self.rungroup_bin[0][15] += population
-            if not isna(edu_universe) and not isna(pct_edu_lths):
-                self.rungroup_bin[1][10] += pct_edu_lths * (edu_universe/total_pop * population)
-                self.rungroup_bin[0][10] += edu_universe/total_pop * population
-                # self.rungroup_bin[0][10] += edu_universe
-            if not isna(pov_universe):
-                self.rungroup_bin[1][11] += pct_pov * (pov_universe/total_pop * population)
-                self.rungroup_bin[0][11] += population
-                # self.rungroup_bin[0][11] += pov_universe
-            if not isna(pov_universe) and not isna(pct_lowinc):
-                self.rungroup_bin[1][12] += pct_lowinc * (pov_universe/total_pop * population)
-                self.rungroup_bin[0][12] += pov_universe
-            if not isna(pct_lingiso):
-                self.rungroup_bin[1][13] += pct_lingiso * population
-                self.rungroup_bin[0][13] += population
-            if not isna(pct_minority):
-                self.rungroup_bin[1][14] += pct_minority * population
-                self.rungroup_bin[0][14] += population
+    def tabulate_rungroup_data(self, df):
+        
+        rungroup_df = df[~df['blkid'].isin(self.used_blocks)]
+        
+        self.rungroup_bin[0][0] += rungroup_df['population'].sum()
+        self.rungroup_bin[0][1] += rungroup_df[rungroup_df['p_minority'].notna()]['population'].sum()
+        self.rungroup_bin[0][2] += rungroup_df[rungroup_df['pnh_afr_am'].notna()]['population'].sum()
+        self.rungroup_bin[0][3] += rungroup_df[rungroup_df['amerind'].notna()]['population'].sum()
+        self.rungroup_bin[0][4] += rungroup_df[rungroup_df['pnh_othmix'].notna()]['population'].sum()
+        self.rungroup_bin[0][5] += rungroup_df[rungroup_df['pt_hisp'].notna()]['population'].sum()
+        self.rungroup_bin[0][6] += rungroup_df[rungroup_df['p_agelt18'].notna()]['population'].sum()
+        self.rungroup_bin[0][7] += rungroup_df[(rungroup_df['p_agelt18'].notna()) &
+                                              (rungroup_df['p_agegt64'].notna())]['population'].sum()
+        self.rungroup_bin[0][8] += rungroup_df[rungroup_df['p_agegt64'].notna()]['population'].sum()
+        self.rungroup_bin[0][9] += rungroup_df[rungroup_df['edu_univ'].notna()]['population'].sum()
+        self.rungroup_bin[0][10] += rungroup_df[(rungroup_df['edu_univ'].notna()) &
+                                   (rungroup_df['p_edulths'].notna())]['eduuniv'].sum()
+        self.rungroup_bin[0][11] += rungroup_df[rungroup_df['pov_univ'].notna()]['population'].sum()
+        self.rungroup_bin[0][12] += rungroup_df[(rungroup_df['pov_univ'].notna()) &
+                                   (rungroup_df['p_2xpov'].notna())]['pov_univ'].sum()
+        self.rungroup_bin[0][13] += rungroup_df[rungroup_df['p_lingiso'].notna()]['population'].sum()
+        self.rungroup_bin[0][14] += rungroup_df[rungroup_df['p_minority'].notna()]['population'].sum()
+        self.rungroup_bin[0][15] += rungroup_df[rungroup_df['pov_univ'].notna()]['population'].sum()
+        
+        self.rungroup_bin[1][1] += rungroup_df[rungroup_df['white'].notna()]['white'].sum()
+        self.rungroup_bin[1][2] += rungroup_df[rungroup_df['black'].notna()]['black'].sum()
+        self.rungroup_bin[1][3] += rungroup_df[rungroup_df['amerind'].notna()]['amerind'].sum()
+        self.rungroup_bin[1][4] += rungroup_df[rungroup_df['other'].notna()]['other'].sum()
+        self.rungroup_bin[1][5] += rungroup_df[rungroup_df['hisp'].notna()]['hisp'].sum()
+        self.rungroup_bin[1][6] += rungroup_df[rungroup_df['agelt18'].notna()]['agelt18'].sum()
+        self.rungroup_bin[1][7] += rungroup_df[rungroup_df['age18to64'].notna()]['age18to64'].sum()
+        self.rungroup_bin[1][8] += rungroup_df[rungroup_df['agegt64'].notna()]['agegt64'].sum()  
+        self.rungroup_bin[1][9] += rungroup_df[rungroup_df['eduuniv100'].notna()]['eduuniv100'].sum()
+        self.rungroup_bin[1][10] += rungroup_df[rungroup_df['nohs'].notna()]['nohs'].sum()
+        self.rungroup_bin[1][11] += rungroup_df[rungroup_df['pov'].notna()]['pov'].sum()
+        self.rungroup_bin[1][12] += rungroup_df[rungroup_df['pov2x'].notna()]['pov2x'].sum()
+        self.rungroup_bin[1][13] += rungroup_df[rungroup_df['lingiso'].notna()]['lingiso'].sum()
+        self.rungroup_bin[1][14] += rungroup_df[rungroup_df['minority'].notna()]['minority'].sum()
+        self.rungroup_bin[1][15] += rungroup_df[rungroup_df['povuniv100'].notna()]['povuniv100'].sum()            
+        
+
+
 
     def create(self):
         self.create_workbook()
         self.calculate_distances()
         self.close_workbook()
-        
+                
         # Write out any missing blockgroups
         if len(self.missingbkgrps) > 0:
             missfname = self.filename_entry + '_' + 'missing_block_groups' + '_' + str(self.radius) + 'km.txt'
@@ -375,24 +213,78 @@ class FacilityProximityAssessment:
             with open(misspath, 'w') as f:
                 for item in self.missingbkgrps:
                     f.write("%s\n" % item)
-            
+        
 
-    # Distance calculation
-    # This utilizes geopandas rather than the query function used in HEM4
-    # As distances will need to be calculated for each facility there are many coordinate pairs,
-    # which go far faster in this method (~5 min per facility)
-    # than if iterated pairwise using just coordinates (~25 min per facility)
-    # Still need to develop a way to keep distances linked to facilities for bin creation and output
     def calculate_distances(self):
+
+        # Distance calculation
+        # This utilizes geopandas rather than the query function used in HEM4.
+        # As distances will need to be calculated for each facility there are many coordinate pairs,
+        # which go far faster in this method than if iterated pairwise using just coordinates.
 
         # Initialize starting data rows for the facility and sortable sheets
         start_row = 3
         sort_row = 1
 
+        #------------------------------------------------------------------------------------------
         # Create national bin and tabulate population weighted demographic stats for each sub group.
+        #------------------------------------------------------------------------------------------
         self.national_bin = [[0]*16 for _ in range(2)]
-        self.acs_df.apply(lambda row: self.tabulate_national_data(row), axis=1)
 
+        national_acs = self.acs_df
+                
+        national_acs['white'] = national_acs['pnh_white'] * national_acs['totalpop']
+        national_acs['black'] = national_acs['pnh_afr_am'] * national_acs['totalpop']
+        national_acs['amerind'] = national_acs['pnh_am_ind'] * national_acs['totalpop']
+        national_acs['other'] = national_acs['pnh_othmix'] * national_acs['totalpop']
+        national_acs['hisp'] = national_acs['pt_hisp'] * national_acs['totalpop']
+        national_acs['agelt18'] = national_acs['p_agelt18'] * national_acs['totalpop']
+        national_acs['agegt64'] = national_acs['p_agegt64'] * national_acs['totalpop']
+        national_acs['age18to64'] = (100 - national_acs['p_agelt18'] - national_acs['p_agegt64']) * national_acs['totalpop']
+        national_acs['eduuniv100'] = national_acs['edu_univ'] * 100 
+        national_acs['povuniv100'] = national_acs['pov_univ'] * 100 
+        national_acs['nohs'] = national_acs['p_edulths'] * national_acs['edu_univ']
+        national_acs['pov'] = national_acs['p_pov'] * national_acs['pov_univ']
+        national_acs['pov2x'] = national_acs['p_2xpov'] * national_acs['pov_univ']
+        national_acs['lingiso'] = national_acs['p_lingiso'] * national_acs['totalpop']
+        national_acs['minority'] = national_acs['p_minority'] * national_acs['totalpop']
+        
+        self.national_bin[0][0] = national_acs['totalpop'].sum()
+        self.national_bin[0][1] = national_acs[national_acs['p_minority'].notna()]['totalpop'].sum()
+        self.national_bin[0][2] = national_acs[national_acs['pnh_afr_am'].notna()]['totalpop'].sum()
+        self.national_bin[0][3] = national_acs[national_acs['amerind'].notna()]['totalpop'].sum()
+        self.national_bin[0][4] = national_acs[national_acs['pnh_othmix'].notna()]['totalpop'].sum()
+        self.national_bin[0][5] = national_acs[national_acs['pt_hisp'].notna()]['totalpop'].sum()
+        self.national_bin[0][6] = national_acs[national_acs['p_agelt18'].notna()]['totalpop'].sum()
+        self.national_bin[0][7] = national_acs[(national_acs['p_agelt18'].notna()) &
+                                              (national_acs['p_agegt64'].notna())]['totalpop'].sum()
+        self.national_bin[0][8] = national_acs[national_acs['p_agegt64'].notna()]['totalpop'].sum()
+        self.national_bin[0][9] = national_acs[national_acs['edu_univ'].notna()]['totalpop'].sum()
+        self.national_bin[0][10] = national_acs[(national_acs['edu_univ'].notna()) &
+                                   (national_acs['p_edulths'].notna())]['edu_univ'].sum()
+        self.national_bin[0][11] = national_acs[national_acs['pov_univ'].notna()]['totalpop'].sum()
+        self.national_bin[0][12] = national_acs[(national_acs['pov_univ'].notna()) &
+                                   (national_acs['p_2xpov'].notna())]['pov_univ'].sum()
+        self.national_bin[0][13] = national_acs[national_acs['p_lingiso'].notna()]['totalpop'].sum()
+        self.national_bin[0][14] = national_acs[national_acs['p_minority'].notna()]['totalpop'].sum()
+        self.national_bin[0][15] = national_acs[national_acs['pov_univ'].notna()]['totalpop'].sum()
+
+        self.national_bin[1][1] = national_acs[national_acs['white'].notna()]['white'].sum()
+        self.national_bin[1][2] = national_acs[national_acs['black'].notna()]['black'].sum()
+        self.national_bin[1][3] = national_acs[national_acs['amerind'].notna()]['amerind'].sum()
+        self.national_bin[1][4] = national_acs[national_acs['other'].notna()]['other'].sum()
+        self.national_bin[1][5] = national_acs[national_acs['hisp'].notna()]['hisp'].sum()
+        self.national_bin[1][6] = national_acs[national_acs['agelt18'].notna()]['agelt18'].sum()
+        self.national_bin[1][7] = national_acs[national_acs['age18to64'].notna()]['age18to64'].sum()
+        self.national_bin[1][8] = national_acs[national_acs['agegt64'].notna()]['agegt64'].sum()  
+        self.national_bin[1][9] = national_acs[national_acs['eduuniv100'].notna()]['eduuniv100'].sum()
+        self.national_bin[1][10] = national_acs[national_acs['nohs'].notna()]['nohs'].sum()
+        self.national_bin[1][11] = national_acs[national_acs['pov'].notna()]['pov'].sum()
+        self.national_bin[1][12] = national_acs[national_acs['pov2x'].notna()]['pov2x'].sum()
+        self.national_bin[1][13] = national_acs[national_acs['lingiso'].notna()]['lingiso'].sum()
+        self.national_bin[1][14] = national_acs[national_acs['minority'].notna()]['minority'].sum()
+        self.national_bin[1][15] = national_acs[national_acs['povuniv100'].notna()]['povuniv100'].sum()
+        
         # Calculate averages by dividing population for each sub group
         for index in range(1, 16):
             if index == 11:
@@ -414,10 +306,8 @@ class FacilityProximityAssessment:
             self.national_bin, self.worksheet_facility, self.formats, start_row) + 1
 
 
-        acsinrange_total_df = pd.DataFrame()
         
         # Process each facility
-        facility_list_length = len(self.faclist_df)
         for index, row in self.faclist_df.iterrows():
             
             print('Calculating proximity for facility: ' + self.faclist_df['facility_id'][index])
@@ -440,10 +330,10 @@ class FacilityProximityAssessment:
                 fac_df.lon, fac_df.lat, crs='epsg:4269'))
             fac_gdf = fac_gdf.to_crs(epsg)
             
-            # Subset census DF to one latitude above and one below and one longitude
+            # Subset census DF to half latitude above and half below and one longitude
             # west and east of this facility
-            census_box = self.censusblks_df[(self.censusblks_df['lat'] >= fac_lat-1)
-                                                & (self.censusblks_df['lat'] <= fac_lat+1)
+            census_box = self.censusblks_df[(self.censusblks_df['lat'] >= fac_lat-0.5)
+                                                & (self.censusblks_df['lat'] <= fac_lat+0.5)
                                                 & (self.censusblks_df['lon'] >= fac_lon-1)
                                                 & (self.censusblks_df['lon'] <= fac_lon+1)]
             
@@ -509,13 +399,6 @@ class FacilityProximityAssessment:
                 else:
                     acsinrange_gdf = commonACS_gdf.append(missing_w_tract, ignore_index=True)
 
-            # Keep a run group level total of all unique blocks
-            if len(acsinrange_total_df) == 0:
-                acsinrange_total_df = acsinrange_gdf
-            else:
-                acsinrange_total_df = pd.concat([acsinrange_total_df, acsinrange_gdf])
-                acsinrange_total_df = acsinrange_total_df.drop_duplicates(
-                    subset='blkid', keep='last').reset_index(drop=True)
 
             acs_columns = ['blkid', 'population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
                            'pnh_am_ind', 'pnh_othmix', 'pt_hisp', 'p_agelt18', 'p_agegt64',
@@ -523,17 +406,69 @@ class FacilityProximityAssessment:
                            'age_univ', 'pov_univ', 'edu_univ', 'iso_univ', 'pov_fl', 'iso_fl']
             acsinrange_df = pd.DataFrame(acsinrange_gdf, columns=acs_columns)
 
-            # Create facility bin and tabulate population weighted demographic stats for each sub
-            # group.
-            acsinrange_df.apply(lambda row: self.tabulate_facility_data(row), axis=1)
-
-            # Add to run group bin
-            if self.rungroup_bin == None:
-                self.rungroup_bin = [[0]*16 for _ in range(2)]
-            acsinrange_df.apply(lambda row: self.tabulate_rungroup_data(row), axis=1)
-
                         
-            # Calculate averages by dividing population for each sub group
+            #------------------------------------------------------------------------------------------
+            # Create facility bin and tabulate population weighted demographic stats for each sub group.
+            #------------------------------------------------------------------------------------------
+            self.facility_bin = [[0]*16 for _ in range(2)]
+            
+            acsinrange_df['white'] = acsinrange_df['pnh_white'] * acsinrange_df['population']
+            acsinrange_df['black'] = acsinrange_df['pnh_afr_am'] * acsinrange_df['population']
+            acsinrange_df['amerind'] = acsinrange_df['pnh_am_ind'] * acsinrange_df['population']
+            acsinrange_df['other'] = acsinrange_df['pnh_othmix'] * acsinrange_df['population']
+            acsinrange_df['hisp'] = acsinrange_df['pt_hisp'] * acsinrange_df['population']
+            acsinrange_df['agelt18'] = acsinrange_df['p_agelt18'] * acsinrange_df['population']
+            acsinrange_df['agegt64'] = acsinrange_df['p_agegt64'] * acsinrange_df['population']
+            acsinrange_df['age18to64'] = (100 - acsinrange_df['p_agelt18'] - acsinrange_df['p_agegt64']) * acsinrange_df['population']
+            acsinrange_df['eduuniv'] = (acsinrange_df['edu_univ'] / acsinrange_df['totalpop']) * acsinrange_df['population']
+            acsinrange_df['eduuniv100'] = (acsinrange_df['edu_univ'] / acsinrange_df['totalpop']) * acsinrange_df['population'] * 100
+            acsinrange_df['povuniv100'] = (acsinrange_df['pov_univ'] / acsinrange_df['totalpop']) * acsinrange_df['population'] * 100 
+            acsinrange_df['nohs'] = acsinrange_df['p_edulths'] * (acsinrange_df['edu_univ'] / acsinrange_df['totalpop']) \
+                                                               * acsinrange_df['population']
+            acsinrange_df['pov'] = acsinrange_df['p_pov'] * (acsinrange_df['pov_univ'] / acsinrange_df['totalpop']) \
+                                                          * acsinrange_df['population']
+            acsinrange_df['pov2x'] = acsinrange_df['p_2xpov'] * (acsinrange_df['pov_univ'] / acsinrange_df['totalpop']) \
+                                                              * acsinrange_df['population']
+            acsinrange_df['lingiso'] = acsinrange_df['p_lingiso'] * acsinrange_df['population']
+            acsinrange_df['minority'] = acsinrange_df['p_minority'] * acsinrange_df['population']
+
+            self.facility_bin[0][0] = acsinrange_df['population'].sum()
+            self.facility_bin[0][1] = acsinrange_df[acsinrange_df['p_minority'].notna()]['population'].sum()
+            self.facility_bin[0][2] = acsinrange_df[acsinrange_df['pnh_afr_am'].notna()]['population'].sum()
+            self.facility_bin[0][3] = acsinrange_df[acsinrange_df['amerind'].notna()]['population'].sum()
+            self.facility_bin[0][4] = acsinrange_df[acsinrange_df['pnh_othmix'].notna()]['population'].sum()
+            self.facility_bin[0][5] = acsinrange_df[acsinrange_df['pt_hisp'].notna()]['population'].sum()
+            self.facility_bin[0][6] = acsinrange_df[acsinrange_df['p_agelt18'].notna()]['population'].sum()
+            self.facility_bin[0][7] = acsinrange_df[(acsinrange_df['p_agelt18'].notna()) &
+                                                  (acsinrange_df['p_agegt64'].notna())]['population'].sum()
+            self.facility_bin[0][8] = acsinrange_df[acsinrange_df['p_agegt64'].notna()]['population'].sum()
+            self.facility_bin[0][9] = acsinrange_df[acsinrange_df['edu_univ'].notna()]['population'].sum()
+            self.facility_bin[0][10] = acsinrange_df[(acsinrange_df['edu_univ'].notna()) &
+                                       (acsinrange_df['p_edulths'].notna())]['eduuniv'].sum()
+            self.facility_bin[0][11] = acsinrange_df[acsinrange_df['pov_univ'].notna()]['population'].sum()
+            self.facility_bin[0][12] = acsinrange_df[(acsinrange_df['pov_univ'].notna()) &
+                                       (acsinrange_df['p_2xpov'].notna())]['pov_univ'].sum()
+            self.facility_bin[0][13] = acsinrange_df[acsinrange_df['p_lingiso'].notna()]['population'].sum()
+            self.facility_bin[0][14] = acsinrange_df[acsinrange_df['p_minority'].notna()]['population'].sum()
+            self.facility_bin[0][15] = acsinrange_df[acsinrange_df['pov_univ'].notna()]['population'].sum()
+            
+            self.facility_bin[1][1] = acsinrange_df[acsinrange_df['white'].notna()]['white'].sum()
+            self.facility_bin[1][2] = acsinrange_df[acsinrange_df['black'].notna()]['black'].sum()
+            self.facility_bin[1][3] = acsinrange_df[acsinrange_df['amerind'].notna()]['amerind'].sum()
+            self.facility_bin[1][4] = acsinrange_df[acsinrange_df['other'].notna()]['other'].sum()
+            self.facility_bin[1][5] = acsinrange_df[acsinrange_df['hisp'].notna()]['hisp'].sum()
+            self.facility_bin[1][6] = acsinrange_df[acsinrange_df['agelt18'].notna()]['agelt18'].sum()
+            self.facility_bin[1][7] = acsinrange_df[acsinrange_df['age18to64'].notna()]['age18to64'].sum()
+            self.facility_bin[1][8] = acsinrange_df[acsinrange_df['agegt64'].notna()]['agegt64'].sum()  
+            self.facility_bin[1][9] = acsinrange_df[acsinrange_df['eduuniv100'].notna()]['eduuniv100'].sum()
+            self.facility_bin[1][10] = acsinrange_df[acsinrange_df['nohs'].notna()]['nohs'].sum()
+            self.facility_bin[1][11] = acsinrange_df[acsinrange_df['pov'].notna()]['pov'].sum()
+            self.facility_bin[1][12] = acsinrange_df[acsinrange_df['pov2x'].notna()]['pov2x'].sum()
+            self.facility_bin[1][13] = acsinrange_df[acsinrange_df['lingiso'].notna()]['lingiso'].sum()
+            self.facility_bin[1][14] = acsinrange_df[acsinrange_df['minority'].notna()]['minority'].sum()
+            self.facility_bin[1][15] = acsinrange_df[acsinrange_df['povuniv100'].notna()]['povuniv100'].sum()            
+                                    
+            # Calculate facility averages by dividing population for each sub group
             for col_index in range(1, 16):
                 if (self.facility_bin[0][col_index]) == 0:
                     self.facility_bin[1][col_index] = 0
@@ -555,7 +490,7 @@ class FacilityProximityAssessment:
             start_row = self.append_aggregated_data(
                 self.facility_bin, self.worksheet_facility, self.formats, start_row)
             
-            # Write to sortable sheet
+            # Write facility to sortable sheet
             sort_bin = self.facility_bin[1]
             sort_bin[0] = self.facility_bin[0][0]
             col_idx = np.array(self.active_columns)
@@ -566,13 +501,17 @@ class FacilityProximityAssessment:
                 self.worksheet_sort.write_number(sort_row, col_num+3, data, format)
             sort_row = sort_row + 1
 
-        # # Create the run group bin and tabulate values
-        # self.rungroup_bin = [[0]*16 for _ in range(2)]
+            # Add facility data to run group bin
+            if self.rungroup_bin == None:
+                self.rungroup_bin = [[0]*16 for _ in range(2)]
+            self.tabulate_rungroup_data(acsinrange_df)
 
-        # acsinrange_total_df = pd.DataFrame(
-        #     acsinrange_total_df.drop_duplicates(subset='blkid', keep='last').reset_index(drop=True),
-        #     columns=acs_columns)
-        # acsinrange_total_df.apply(lambda row: self.tabulate_rungroup_data(row), axis=1)
+            # Put blkid's from acsinrange_df into unique list of used blocks for later use by rungroup
+            acsblk_list = acsinrange_df['blkid'].tolist()
+            allblks = self.used_blocks
+            allblks.extend(acsblk_list)
+            self.used_blocks = list(set(allblks))
+
 
         #----------- Process the run group bin --------------------
         
@@ -614,8 +553,7 @@ class FacilityProximityAssessment:
     # Create Workbook
     # Final workbook should have similar formatting as ej tables, with two rows for nationwide
     # demographics (population and percentages) and two rows for each facility provided in the
-    # original faclist. Facility names should also be provided in column A, although that has not
-    # yet been added.
+    # original faclist. 
     def create_workbook(self):
         output_dir = self.fullpath
         if not (os.path.exists(output_dir) or os.path.isdir(output_dir)):
@@ -722,3 +660,4 @@ class FacilityProximityAssessment:
         
     def close_workbook(self):
         self.workbook.close()
+
