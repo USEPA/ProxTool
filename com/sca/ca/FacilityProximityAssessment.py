@@ -16,7 +16,6 @@ import xlsxwriter
 
 from copy import deepcopy
 from decimal import ROUND_HALF_UP, Decimal, getcontext
-from math import *
 from pandas import isna
 from tkinter import messagebox
 from com.sca.ca.model.ACSDataset import ACSDataset
@@ -59,6 +58,23 @@ class FacilityProximityAssessment:
         self.neededBlockColumns = ['blkid', 'population', 'lat', 'lon']
         
 
+    def haversineDistance(self, lon1, lat1, lon2, lat2):
+        """
+        Calculate the great circle distance in kilometers between two points 
+        on the earth (specified in decimal degrees)
+        """
+        # convert decimal degrees to radians 
+        lon1, lat1, lon2, lat2 = map(np.deg2rad, [lon1, lat1, lon2, lat2])
+        
+        # haversine formula 
+        dlon = lon2 - lon1 
+        dlat = lat2 - lat1 
+        a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+        c = 2 * np.arcsin(np.sqrt(a)) 
+        r = 6371 # Radius of earth in kilometers. Use 3956 for miles. Determines return value units.
+        return c * r        
+ 
+       
     def create_formats(self, workbook):
         formats = {}
 
@@ -133,7 +149,7 @@ class FacilityProximityAssessment:
     def append_aggregated_data(self, values, worksheet, formats, startrow):
 
         data = deepcopy(values)
-
+                
         # First, select the columns that are relevant
         row_idx = np.array([i for i in range(0, len(data))])
         col_idx = np.array(self.active_columns)
@@ -149,7 +165,7 @@ class FacilityProximityAssessment:
                 value = slice[row][col]
                 if value != "":
                     value = float(value)
-                    format = formats['percentage'] if value <= 1 else formats['number']
+                    format = formats['percentage'] if row == 1 else formats['number']
                     worksheet.write_number(startrow+row, startcol+col, value, format)
                 else:
                     worksheet.write(startrow+row, startcol+col, value)
@@ -316,19 +332,19 @@ class FacilityProximityAssessment:
             
             fac_lat = row['lat']
             fac_lon = row['lon']
-            fac_latrad = radians(row['lat'])
-            fac_lonrad = radians(row['lon'])
+            # fac_latrad = radians(row['lat'])
+            # fac_lonrad = radians(row['lon'])
 
-            # Convert this facility's lat/lon to UTM
-            fac_utmn, fac_utme, fac_utmz, hemi, epsg = UTM.ll2utm(fac_lat, fac_lon)
+            # # Convert this facility's lat/lon to UTM
+            # fac_utmn, fac_utme, fac_utmz, hemi, epsg = UTM.ll2utm(fac_lat, fac_lon)
                         
-            # Create geodataframe of this one facility
-            latlon = [[fac_lat, fac_lon]]
-            fac_df = pd.DataFrame(latlon, columns=['lat', 'lon'])
-            fac_gdf = gpd.GeoDataFrame(
-                fac_df, geometry=gpd.points_from_xy(
-                fac_df.lon, fac_df.lat, crs='epsg:4269'))
-            fac_gdf = fac_gdf.to_crs(epsg)
+            # # Create geodataframe of this one facility
+            # latlon = [[fac_lat, fac_lon]]
+            # fac_df = pd.DataFrame(latlon, columns=['lat', 'lon'])
+            # fac_gdf = gpd.GeoDataFrame(
+            #     fac_df, geometry=gpd.points_from_xy(
+            #     fac_df.lon, fac_df.lat, crs='epsg:4269'))
+            # fac_gdf = fac_gdf.to_crs(epsg)
             
             # Subset census DF to half latitude above and half below and one longitude
             # west and east of this facility
@@ -340,71 +356,77 @@ class FacilityProximityAssessment:
             # Reduce the number of columns
             census_box = census_box[self.neededBlockColumns]
             
-            # Create geodataframe of census_latband and census_lonband and then convert CRS to UTM of facility
-            censusblks_gdf = gpd.GeoDataFrame(
-                census_box, geometry=gpd.points_from_xy(
-                census_box.lon, census_box.lat, crs='epsg:4269'))
-            censusblks_gdf = censusblks_gdf.to_crs(epsg)
+            # Compute distance in km between each census block and the facility
+            census_box['dist_km'] = self.haversineDistance(fac_lon, fac_lat, census_box['lon'], census_box['lat'])
             
-            censusblks_gdf['utme'] = censusblks_gdf.geometry.x
-            censusblks_gdf['utmn'] = censusblks_gdf.geometry.y
+            # Subset census blocks to user defined radius
+            blksinrange_df = census_box[census_box['dist_km'] <= self.radius]
             
-            # Compute distance between blocks and facility (in meters)
-            censusblks_gdf['dist_m'] = censusblks_gdf.apply(lambda row: np.sqrt((fac_utme - row['utme'])**2 +
-                                        (fac_utmn - row['utmn'])**2), axis=1)
+            # # Create geodataframe of census_latband and census_lonband and then convert CRS to UTM of facility
+            # censusblks_gdf = gpd.GeoDataFrame(
+            #     census_box, geometry=gpd.points_from_xy(
+            #     census_box.lon, census_box.lat, crs='epsg:4269'))
+            # censusblks_gdf = censusblks_gdf.to_crs(epsg)
+            
+            # censusblks_gdf['utme'] = censusblks_gdf.geometry.x
+            # censusblks_gdf['utmn'] = censusblks_gdf.geometry.y
+            
+            # # Compute distance between blocks and facility (in meters)
+            # censusblks_gdf['dist_m'] = censusblks_gdf.apply(lambda row: np.sqrt((fac_utme - row['utme'])**2 +
+            #                             (fac_utmn - row['utmn'])**2), axis=1)
                         
-            # Subset to user defined radius
-            blksinrange_gdf = censusblks_gdf[censusblks_gdf['dist_m'] <= self.radius*1000]
+            # # Subset to user defined radius
+            # blksinrange_gdf = censusblks_gdf[censusblks_gdf['dist_m'] <= self.radius*1000]
             
             # Remove blocks corresponding to schools, monitors, etc.
-            blksinrange_gdf = blksinrange_gdf.loc[
-                (~blksinrange_gdf['blkid'].str.contains('S')) &
-                (~blksinrange_gdf['blkid'].str.contains('M'))]
+            blksinrange_df = blksinrange_df.loc[
+                (~blksinrange_df['blkid'].str.contains('S')) &
+                (~blksinrange_df['blkid'].str.contains('M'))]
 
-            blksinrange_gdf['bkgrp'] = blksinrange_gdf['blkid'].astype(str).str[:12]
+            blksinrange_df['bkgrp'] = blksinrange_df['blkid'].astype(str).str[:12]
                         
             # Merge with ACS blockgroup data
             # Note: Not all blockgroups in blksinrange_gdf will be in the ACS blockgroup data
-            commonACS_gdf = blksinrange_gdf.merge(
+            commonACS_df = blksinrange_df.merge(
                 self.acs_df.astype({'bkgrp': 'str'}), how='inner', left_on='bkgrp', right_on='bkgrp')
 
             # Identify any census blockgroups that are not in the ACS blockgroup data
-            missing_gdf = blksinrange_gdf[(~blksinrange_gdf.bkgrp.isin(commonACS_gdf.bkgrp))].copy()
+            missing_df = blksinrange_df[(~blksinrange_df.bkgrp.isin(commonACS_df.bkgrp))].copy()
             
-            if len(missing_gdf) == 0:
-                acsinrange_gdf = commonACS_gdf
+            if len(missing_df) == 0:
+                acsinrange_df = commonACS_df
                 
             else:
                 # Add these missing blockgroups to the missing set
-                missbkgrp = missing_gdf['bkgrp'].tolist()
+                missbkgrp = missing_df['bkgrp'].tolist()
                 self.missingbkgrps.update(missbkgrp)
                 
                 # First try to default missing blockgroups to tracts
-                missing_gdf['tract'] = missing_gdf['bkgrp'].str[:11]
-                missing_w_tract = missing_gdf.merge(
+                missing_df['tract'] = missing_df['bkgrp'].str[:11]
+                missing_w_tract = missing_df.merge(
                     self.acsCountyTract_df, how='inner', left_on='tract', right_on='ID')
                 
                 # Next, consider counties
-                if (len(commonACS_gdf) + len(missing_w_tract)) != len(blksinrange_gdf):
-                    missing_gdf['county'] = missing_gdf['bkgrp'].str[:5]
-                    stillmissing_gdf = missing_gdf[(~missing_gdf.tract.isin(self.acsCountyTract_df.ID))]
-                    missing_w_county = stillmissing_gdf.merge(
+                if (len(commonACS_df) + len(missing_w_tract)) != len(blksinrange_df):
+                    missing_df['county'] = missing_df['bkgrp'].str[:5]
+                    stillmissing_df = missing_df[(~missing_df.tract.isin(self.acsCountyTract_df.ID))]
+                    missing_w_county = stillmissing_df.merge(
                         self.acsCountyTract_df, how='inner', left_on='county', right_on='ID')
                 
-                    if (len(commonACS_gdf) + len(missing_w_tract) + len(missing_w_county)) != len(blksinrange_gdf):
-                        completelymissing_gdf = stillmissing_gdf[(~stillmissing_gdf.county.isin(self.acsCountyTract_df.ID))]
+                    if (len(commonACS_df) + len(missing_w_tract) + len(missing_w_county)) != len(blksinrange_df):
+                        completelymissing_df = stillmissing_df[(~stillmissing_df.county.isin(self.acsCountyTract_df.ID))]
                         # messagebox.showinfo("Warning", "There are some census blocks that could not be matched to " +
                         #                     "ACS blockgroup or ACS default data.")
-                    acsinrange_gdf = commonACS_gdf.append([missing_w_tract,missing_w_county], ignore_index=True)
+                    acsinrange_df = commonACS_df.append([missing_w_tract,missing_w_county], ignore_index=True)
                 else:
-                    acsinrange_gdf = commonACS_gdf.append(missing_w_tract, ignore_index=True)
+                    acsinrange_df = commonACS_df.append(missing_w_tract, ignore_index=True)
 
 
             acs_columns = ['blkid', 'population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
                            'pnh_am_ind', 'pnh_othmix', 'pt_hisp', 'p_agelt18', 'p_agegt64',
                            'p_2xpov', 'p_pov', 'age_25up', 'p_edulths', 'p_lingiso',
                            'age_univ', 'pov_univ', 'edu_univ', 'iso_univ', 'pov_fl', 'iso_fl']
-            acsinrange_df = pd.DataFrame(acsinrange_gdf, columns=acs_columns)
+            acsinrange_df = pd.DataFrame(acsinrange_df, columns=acs_columns)
 
                         
             #------------------------------------------------------------------------------------------
