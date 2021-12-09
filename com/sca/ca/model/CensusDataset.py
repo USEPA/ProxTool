@@ -2,7 +2,6 @@ import datetime
 import os
 import re
 import numpy as np
-import pandas as pd
 from com.sca.ca.model.CSVDataset import CSVDataset
 
 
