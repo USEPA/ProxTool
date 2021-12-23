@@ -4,6 +4,7 @@ import re
 import numpy as np
 import pandas as pd
 
+
 class CSVDataset:
 
     def __init__(self, path, createDataframe=True):
@@ -21,36 +22,11 @@ class CSVDataset:
     # and then convert columns which have been specified as numeric to a float64. That way, all empty
     # values in the resultant dataframe become NaN values. All values will either be strings or float64s.
     def readFromPath(self, colnames):
+
         with open(self.path, "rb") as f:
-
-            # try:
-            #     df = pd.read_csv(f, skiprows=self.skiprows, names=colnames, dtype=str, 
-            #                      na_values=[''], keep_default_na=False)
-
-            # except BaseException as e:
-
-            #     if isinstance(e, ValueError):
-
-            #         msg = e.args[0]
-            #         if msg.startswith("Length mismatch"):
-            #             # i.e. 'Length mismatch: Expected axis has 5 elements, new values have 31 elements'
-            #             p = re.compile("Expected axis has (.*) elements, new values have (.*) elements")
-            #             result = p.search(msg)
-            #             custom_msg = "Length Mismatch: Input file has " + result.group(1) + " columns, but should have " + \
-            #                          result.group(2) + " columns. Please make sure you have selected the correct file or file version."
-            #             print("Error uploading input file: " + custom_msg)
-            #         else:
-            #             print("Error uploading input file: " + str(e) + " Please make sure you have selected the correct file or file version.")
-            #     else:
-            #         print("Error uploading input file: " + str(e) + " Please make sure you have selected the correct file or file version.")
-
-            # else:
-            #     df = df.astype(str).applymap(self.convertEmptyToNaN)
-            #     types = self.get_column_types()
-            #     df = df.astype(dtype=types)
-
+            
             df = pd.read_csv(f, skiprows=self.skiprows, names=colnames, dtype=str, 
-                                     na_values=[''], keep_default_na=False)
+                                      na_values=[''], keep_default_na=False)
 
             df = df.astype(str).applymap(self.convertEmptyToNaN)
             types = self.get_column_types()

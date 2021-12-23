@@ -5,6 +5,7 @@ from PIL import ImageTk
 from functools import partial
 
 from tkinter import messagebox
+import traceback
 
 from com.sca.ca.FacilityProximityAssessment import FacilityProximityAssessment
 from com.sca.ca.gui.EntryWithPlaceHolder import EntryWithPlaceholder
@@ -176,8 +177,11 @@ class MainView(tk.Frame):
                 self.reset_gui()
                 break
             except Exception as e:
+                # messagebox.showinfo("Error", "An error has been generated while trying to run the assessment Create function. \n" +
+                #                     "The error says: \n" + str(e))
                 messagebox.showinfo("Error", "An error has been generated while trying to run the assessment Create function. \n" +
-                                    "The error says: \n" + str(e))
+                                    "See traceback")
+                print(traceback.format_exc())
                 self.reset_run_button()
                 break
                 
