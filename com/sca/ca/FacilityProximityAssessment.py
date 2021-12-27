@@ -125,6 +125,8 @@ class FacilityProximityAssessment:
 
         formats['int_percentage'] = workbook.add_format({
             'num_format': '0%'})
+        
+        formats['superscript'] = workbook.add_format({'font_script': 1})
 
         return formats
 
@@ -166,6 +168,9 @@ class FacilityProximityAssessment:
                 if value != "":
                     value = float(value)
                     format = formats['percentage'] if row == 1 else formats['number']
+                    # Override format for the National row
+                    if numrows==1:
+                        format = formats['percentage'] if col > 0 else formats['number'] 
                     worksheet.write_number(startrow+row, startcol+col, value, format)
                 else:
                     worksheet.write(startrow+row, startcol+col, value)
@@ -238,9 +243,9 @@ class FacilityProximityAssessment:
         # As distances will need to be calculated for each facility there are many coordinate pairs,
         # which go far faster in this method than if iterated pairwise using just coordinates.
 
-        # Initialize starting data rows for the facility and sortable sheets
+        # Initialize starting data rows for the facility and sortable sheets (zero-indexed)
         start_row = 3
-        sort_row = 1
+        sort_row = 2
 
         #------------------------------------------------------------------------------------------
         # Create national bin and tabulate population weighted demographic stats for each sub group.
@@ -301,25 +306,37 @@ class FacilityProximityAssessment:
         self.national_bin[1][14] = national_acs[national_acs['minority'].notna()]['minority'].sum()
         self.national_bin[1][15] = national_acs[national_acs['povuniv100'].notna()]['povuniv100'].sum()
         
+        # Only demographic percentages of the National bin will be reported
+
         # Calculate averages by dividing population for each sub group
         for index in range(1, 16):
             if index == 11:
-                self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][0])
+                self.national_bin[0][index] = self.national_bin[1][index] / (100 * self.national_bin[0][0])
             else:
-                self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][index])
-
-        self.national_bin[0][15] = self.national_bin[0][0] * self.national_bin[1][15]
-        for index in range(1, 15):
-            if index == 10:
-                self.national_bin[0][index] = self.national_bin[0][9] * self.national_bin[1][index]
-            else:
-                self.national_bin[0][index] = self.national_bin[0][0] * self.national_bin[1][index]
-
-        self.national_bin[1][0] = ""
+                self.national_bin[0][index] = self.national_bin[1][index] / (100 * self.national_bin[0][index])
         
-        # Write to facility sheet
+        # Delete index 1 from the Natinal bin list
+        del self.national_bin[-1]
+        
+        # # Calculate averages by dividing population for each sub group
+        # for index in range(1, 16):
+        #     if index == 11:
+        #         self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][0])
+        #     else:
+        #         self.national_bin[1][index] = self.national_bin[1][index] / (100 * self.national_bin[0][index])
+
+        # self.national_bin[0][15] = self.national_bin[0][0] * self.national_bin[1][15]
+        # for index in range(1, 15):
+        #     if index == 10:
+        #         self.national_bin[0][index] = self.national_bin[0][9] * self.national_bin[1][index]
+        #     else:
+        #         self.national_bin[0][index] = self.national_bin[0][0] * self.national_bin[1][index]
+
+        # self.national_bin[1][0] = ""
+        
+        # Write to facility sheet and leave rows for the run group total
         start_row = self.append_aggregated_data(
-            self.national_bin, self.worksheet_facility, self.formats, start_row) + 1
+            self.national_bin, self.worksheet_facility, self.formats, start_row) + 5
 
 
         
@@ -556,12 +573,12 @@ class FacilityProximityAssessment:
         self.rungroup_bin[1][0] = ""
 
         # Write to facility sheet
-        self.worksheet_facility.write_string(start_row+1, 0, 'Run group total', self.formats['sub_header_3'])
+        self.worksheet_facility.merge_range('A7:A8', 'Run group total', self.formats['sub_header_3'])
         start_row = self.append_aggregated_data(
-            self.rungroup_bin, self.worksheet_facility, self.formats, start_row+1)
+            self.rungroup_bin, self.worksheet_facility, self.formats, 6)
 
         # Write to sortable sheet
-        self.worksheet_sort.write_string(sort_row, 0, 'Run group total', self.formats['sub_header_3'])
+        self.worksheet_sort.write_string(1, 0, 'Run group total', self.formats['sub_header_3'])
         sort_bin = self.rungroup_bin[1]
         sort_bin[0] = self.rungroup_bin[0][0]
         col_idx = np.array(self.active_columns)
@@ -569,8 +586,8 @@ class FacilityProximityAssessment:
 
         for col_num, data in enumerate(slice):
             format = self.formats['percentage'] if data <= 1 else self.formats['number']
-            self.worksheet_sort.write_number(sort_row, col_num+3, data, format)
-        sort_row = sort_row + 1
+            self.worksheet_sort.write_number(1, col_num+3, data, format)
+        # sort_row = sort_row + 1
         
     # Create Workbook
     # Final workbook should have similar formatting as ej tables, with two rows for nationwide
@@ -601,8 +618,11 @@ class FacilityProximityAssessment:
         lastcol = chr(ord(firstcol) + len(column_headers))
         top_header_coords = firstcol+'1:'+lastcol+'1'
 
-        # Increase the cell size of the merged cells to highlight the formatting.
-        self.worksheet_facility.set_column(top_header_coords, 12)
+        # Set first column width to 16; all others to 12
+        self.worksheet_facility.set_column("A1:A1", 16)
+        self.worksheet_facility.set_column("B1:"+lastcol+"1", 12)
+        
+        # Increase the cell size of the top row to highlight the formatting.
         self.worksheet_facility.set_row(0, 30)
 
         # Create top level header
@@ -610,8 +630,12 @@ class FacilityProximityAssessment:
 
         # Create column headers
         self.worksheet_facility.merge_range("A2:A3", 'Population Basis', self.formats['sub_header_2'])
-        self.worksheet_facility.merge_range("A4:A5", 'Nationwide', self.formats['sub_header_3'])
-        self.worksheet_facility.merge_range("B2:N2", 'Demographic Group',  self.formats['sub_header_3'])
+        self.worksheet_facility.write_string("A4", 'Nationwide Demographics (2015-2019 ACS)', self.formats['sub_header_3'])
+        self.worksheet_facility.write_string("A5", 'Nationwide (2010 Decennial Census)', self.formats['sub_header_3'])
+        self.worksheet_facility.write_number("B5", 308745538, self.formats['number'])
+        self.worksheet_facility.merge_range("B2:N2", '',  self.formats['sub_header_3'])
+        self.worksheet_facility.write_rich_string("B2", 'Demographic Group',  self.formats['superscript']
+                                                  , '1', self.formats['sub_header_3'])
 
         self.worksheet_facility.set_row(2, 72, self.formats['sub_header_2'])
         for col_num, data in enumerate(column_headers):
@@ -619,7 +643,7 @@ class FacilityProximityAssessment:
 
         # Add Facility Names
         facname_list = self.faclist_df['facility_id'].tolist()
-        row_num = 6
+        row_num = 9
         for index, data in enumerate(facname_list):
             self.worksheet_facility.merge_range(row_num, 0, row_num + 1, 0, data, self.formats['sub_header_3'])
             row_num = row_num + 2
@@ -633,17 +657,21 @@ class FacilityProximityAssessment:
         lastcol = chr(ord(firstcol) + len(column_headers))
         notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(first_notes_row)
         # notes_coords = firstcol+str(first_notes_row)+':'+lastcol+str(last_notes_row)
-        self.worksheet_facility.merge_range(notes_coords, 'Notes:\n' + \
-          '* Total nationwide population includes all 50 states plus Puerto Rico.\n' + \
-          '* Distributions by race, ethnicity, age, education, income and linguistic isolation are based on ' + \
-          "demographic information at the census block group level, provided by the Census' American Community Survey (ACS) 5-year averages. Demographic percentages based on different averages may differ.\n" + \
-          '* The minority population includes people identifying as African American, Native American, Other ' + \
-          'and Multiracial, or Hispanic/Latino. Measures are taken to avoid double counting of people identifying ' + \
-          'as both Hispanic/Latino and a racial minority. ' + \
-          'In order to avoid double counting, the "Hispanic or Latino" category is treated as a distinct ' + \
-          'demographic category for these analyses. A person is identified as one of five racial/ethnic ' + \
-          'categories above: White, African American, Native American, Other and Multiracial, or Hispanic/Latino.\n' \
+        self.worksheet_facility.merge_range(notes_coords, '', self.formats['notes'])
+
+        self.worksheet_facility.write_rich_string(firstcol+str(first_notes_row), self.formats['superscript'], '1'
+          , ('The demographic percentages are based on the Census’ 2015-2019 American Community Survey five-year averages, at the block group level, and include Puerto Rico. Demographic '
+             'percentages based on different averages may differ. The total population at the run group and facility level are based on block level data from the 2010 Decennial Census. Populations by '
+             'demographic group at the run group-level and facility-level are determined by multiplying each 2010 Decennial block population within the indicated radius by the ACS demographic '
+             'percentages describing the block group containing each block, and then summing over the appropriate area (run group wide or facility-specific).')
           ,  self.formats['notes'])
+
+        # self.worksheet_facility.merge_range(notes_coords
+        #   , ('The demographic percentages are based on the Census’ 2015-2019 American Community Survey five-year averages, at the block group level, and include Puerto Rico. Demographic '
+        #      'percentages based on different averages may differ. The total population at the run group and facility level are based on block level data from the 2010 Decennial Census. Populations by '
+        #      'demographic group at the run group-level and facility-level are determined by multiplying each 2010 Decennial block population within the indicated radius by the ACS demographic '
+        #      'percentages describing the block group containing each block, and then summing over the appropriate area (run group wide or facility-specific).')
+        #   ,  self.formats['notes'])
 
         self.worksheet_facility.set_row(first_notes_row-1, 120)
 
@@ -662,8 +690,9 @@ class FacilityProximityAssessment:
         lastcol = chr(ord(firstcol) + len(sort_headers))
         top_header_coords = firstcol+'1:'+lastcol+'1'
 
-        # Increase the column width.
-        self.worksheet_sort.set_column(top_header_coords, 12)
+        # Increase the column width. First column is 16; all others are 12.
+        self.worksheet_sort.set_column("A1:A1", 16)
+        self.worksheet_sort.set_column("B1:"+lastcol+"1", 12)
               
         # Create column headers
         self.worksheet_sort.set_row(0, 72, self.formats['sub_header_2'])
@@ -672,7 +701,7 @@ class FacilityProximityAssessment:
         
         # Add Facility ID, Lat, Lon
         facname_list = self.faclist_df['facility_id'].tolist()
-        row_num = 1
+        row_num = 2
         for index, row in self.faclist_df.iterrows():
             self.worksheet_sort.write_string(row_num, 0, row['facility_id'], self.formats['sub_header_3'])
             self.worksheet_sort.write_number(row_num, 1, row['lon'], self.formats['sub_header_3'])
