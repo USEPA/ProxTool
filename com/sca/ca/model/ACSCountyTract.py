@@ -5,17 +5,18 @@ from com.sca.ca.model.CSVDataset import CSVDataset
 class ACSCountyTract(CSVDataset):
 
     def get_columns(self):
-        return ['ID', 'TOTALPOP', 'PCT_MINORITY', 'PCT_WHITE', 'PCT_BLACK', 'PCT_AMIND', 'PCT_OTHER_RACE', 'PCT_HISP',
-                'PCT_AGE_LT18', 'PCT_AGE_GT64', 'POV_UNIVERSE', 'PCT_LOWINC', 'PCT_POV', 'EDU_UNIVERSE', 'PCT_EDU_LTHS', 
-                'PCT_LINGISO', 'POVERTY_FLAG', 'EDUCATION_FLAG', 'LING_ISO_FLAG']
+        return ['ID', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
+                'pnh_am_ind', 'pnh_othmix', 'pt_hisp', 'p_agelt18', 'p_agegt64',
+                'pov_univ', 'p_2xpov', 'p_pov', 'edu_univ', 'p_edulths', 'p_lingiso',
+                'pov_fl', 'edu_fl', 'iso_fl']
 
     def get_numeric_columns(self):
-        return ['TOTALPOP', 'PCT_MINORITY', 'PCT_WHITE', 'PCT_BLACK', 'PCT_AMIND', 'PCT_OTHER_RACE', 'PCT_HISP',
-                               'PCT_AGE_LT18', 'PCT_AGE_GT64', 'POV_UNIVERSE', 'PCT_LOWINC', 'PCT_POV', 'EDU_UNIVERSE', 'PCT_EDU_LTHS', 
-                               'PCT_LINGISO']
+        return ['totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
+                'pnh_am_ind', 'pnh_othmix', 'pt_hisp', 'p_agelt18', 'p_agegt64',
+                'pov_univ', 'p_2xpov', 'p_pov', 'edu_univ', 'p_edulths', 'p_lingiso']
 
     def get_string_columns(self):
-        return ['ID', 'POVERTY_FLAG', 'EDUCATION_FLAG', 'LING_ISO_FLAG']
+        return ['ID', 'pov_fl', 'edu_fl', 'iso_fl']
 
 
 

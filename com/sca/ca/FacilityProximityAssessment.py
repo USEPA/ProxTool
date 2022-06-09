@@ -7,20 +7,12 @@ Created on Wed Jul 21 14:06:32 2021
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import os
-from pyproj import _datadir, datadir
-from fiona import _shim, schema
-import geopandas as gpd
 import numpy as np
 import xlsxwriter
 import pandas as pd
 
 from copy import deepcopy
 from decimal import ROUND_HALF_UP, Decimal, getcontext
-from pandas import isna
-# from tkinter import messagebox
-# from com.sca.ca.model.ACSDataset import ACSDataset
-# from com.sca.ca.model.CensusDataset import CensusDataset
-# from com.sca.ca.model.FacilityList import FacilityList
 from com.sca.ca.support.UTM import *
 
 
@@ -238,11 +230,6 @@ class FacilityProximityAssessment:
 
     def calculate_distances(self):
 
-        # Distance calculation
-        # This utilizes geopandas rather than the query function used in HEM4.
-        # As distances will need to be calculated for each facility there are many coordinate pairs,
-        # which go far faster in this method than if iterated pairwise using just coordinates.
-
         # Initialize starting data rows for the facility and sortable sheets (zero-indexed)
         start_row = 3
         sort_row = 3
@@ -361,10 +348,11 @@ class FacilityProximityAssessment:
             blksinrange_df = census_box[census_box['dist_km'] <= self.radius]
             
             
-            # Remove blocks corresponding to schools, monitors, etc.
+            # Remove blocks corresponding to schools, monitors, and user receptors.
             blksinrange_df = blksinrange_df.loc[
                 (~blksinrange_df['blkid'].str.contains('S')) &
-                (~blksinrange_df['blkid'].str.contains('M'))]
+                (~blksinrange_df['blkid'].str.contains('M')) &
+                (~blksinrange_df['blkid'].str.contains('U'))]
 
             blksinrange_df['bkgrp'] = blksinrange_df['blkid'].astype(str).str[:12]
                         
@@ -665,7 +653,7 @@ class FacilityProximityAssessment:
           , self.formats['notes'])
 
         # Set row height for the notes
-        self.worksheet_facility.set_row(first_notes_row-1, 220)
+        self.worksheet_facility.set_row(first_notes_row-1, 230)
 
 
         #------------ Sortable Spreadsheet ----------------------------------------------
