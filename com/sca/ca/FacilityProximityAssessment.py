@@ -44,7 +44,7 @@ class FacilityProximityAssessment:
         self.radius = int(radius)
 
         # Identify the relevant column indexes from the national and facility bins
-        self.active_columns = [0, 1, 14, 2, 3, 4, 5, 6, 7, 8, 11, 9, 10, 13]
+        self.active_columns = [0, 1, 14, 2, 3, 4, 5, 6, 7, 8, 11, 12, 9, 10, 13]
         
         # Needed columns from census block dataframe
         self.neededBlockColumns = ['blkid', 'population', 'lat', 'lon']
@@ -189,7 +189,7 @@ class FacilityProximityAssessment:
                                    (rungroup_df['p_edulths'].notna())]['eduuniv'].sum()
         self.rungroup_bin[0][11] += rungroup_df[rungroup_df['pov_univ'].notna()]['population'].sum()
         self.rungroup_bin[0][12] += rungroup_df[(rungroup_df['pov_univ'].notna()) &
-                                   (rungroup_df['p_2xpov'].notna())]['pov_univ'].sum()
+                                   (rungroup_df['p_2xpov'].notna())]['population'].sum()
         self.rungroup_bin[0][13] += rungroup_df[rungroup_df['p_lingiso'].notna()]['population'].sum()
         self.rungroup_bin[0][14] += rungroup_df[rungroup_df['p_minority'].notna()]['population'].sum()
         self.rungroup_bin[0][15] += rungroup_df[rungroup_df['pov_univ'].notna()]['population'].sum()
@@ -272,7 +272,7 @@ class FacilityProximityAssessment:
                                    (national_acs['p_edulths'].notna())]['edu_univ'].sum()
         self.national_bin[0][11] = national_acs[national_acs['pov_univ'].notna()]['totalpop'].sum()
         self.national_bin[0][12] = national_acs[(national_acs['pov_univ'].notna()) &
-                                   (national_acs['p_2xpov'].notna())]['pov_univ'].sum()
+                                   (national_acs['p_2xpov'].notna())]['totalpop'].sum()
         self.national_bin[0][13] = national_acs[national_acs['p_lingiso'].notna()]['totalpop'].sum()
         self.national_bin[0][14] = national_acs[national_acs['p_minority'].notna()]['totalpop'].sum()
         self.national_bin[0][15] = national_acs[national_acs['pov_univ'].notna()]['totalpop'].sum()
@@ -346,8 +346,7 @@ class FacilityProximityAssessment:
             
             # Subset census blocks to user defined radius
             blksinrange_df = census_box[census_box['dist_km'] <= self.radius]
-            
-            
+                        
             # Remove blocks corresponding to schools, monitors, and user receptors.
             blksinrange_df = blksinrange_df.loc[
                 (~blksinrange_df['blkid'].str.contains('S')) &
@@ -394,9 +393,9 @@ class FacilityProximityAssessment:
 
 
             acs_columns = ['blkid', 'population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
-                           'pnh_am_ind', 'pnh_othmix', 'pt_hisp', 'p_agelt18', 'p_agegt64',
-                           'p_2xpov', 'p_pov', 'age_25up', 'p_edulths', 'p_lingiso',
-                           'age_univ', 'pov_univ', 'edu_univ', 'iso_univ', 'pov_fl', 'iso_fl']
+                           'pnh_am_ind', 'pt_hisp', 'pnh_othmix', 'p_agelt18', 'p_agegt64',
+                           'p_2xpov', 'p_pov', 'p_edulths', 'p_lingiso',
+                           'pov_univ', 'edu_univ', 'iso_univ']
             acsinrange_df = pd.DataFrame(acsinrange_df, columns=acs_columns)
 
                         
@@ -440,7 +439,7 @@ class FacilityProximityAssessment:
                                        (acsinrange_df['p_edulths'].notna())]['eduuniv'].sum()
             self.facility_bin[0][11] = acsinrange_df[acsinrange_df['pov_univ'].notna()]['population'].sum()
             self.facility_bin[0][12] = acsinrange_df[(acsinrange_df['pov_univ'].notna()) &
-                                       (acsinrange_df['p_2xpov'].notna())]['pov_univ'].sum()
+                                       (acsinrange_df['p_2xpov'].notna())]['population'].sum()
             self.facility_bin[0][13] = acsinrange_df[acsinrange_df['p_lingiso'].notna()]['population'].sum()
             self.facility_bin[0][14] = acsinrange_df[acsinrange_df['p_minority'].notna()]['population'].sum()
             self.facility_bin[0][15] = acsinrange_df[acsinrange_df['pov_univ'].notna()]['population'].sum()
@@ -535,7 +534,7 @@ class FacilityProximityAssessment:
             self.rungroup_bin, self.worksheet_facility, self.formats, 6)
 
         # Write to sortable sheet
-        self.worksheet_sort.write_string(1, 0, 'Nationwide Demographics (2015-2019 ACS)', self.formats['sub_header_3'])
+        self.worksheet_sort.write_string(1, 0, 'Nationwide Demographics (2016-2020 ACS)', self.formats['sub_header_3'])
         self.worksheet_sort.write_string(2, 0, 'Run group total', self.formats['sub_header_3'])
         sort_bin = self.rungroup_bin[1]
         sort_bin[0] = self.rungroup_bin[0][0]
@@ -565,10 +564,12 @@ class FacilityProximityAssessment:
 
         tablename = 'Population Demographics within ' + str(self.radius) + ' km of Source Facilities'
         
-        column_headers = ['Total Population', 'White', 'Minority', 'African American',
+        column_headers = ['Total Population', 'White', 'People of Color', 'African American',
                           'Native American', 'Other and Multiracial', 'Hispanic or Latino',
                           'Age (Years)\n0-17', 'Age (Years)\n18-64', 'Age (Years)\n>=65',
-                          'People Living Below the Poverty Level', 'Total Number >= 25 Years Old',
+                          'People Living Below the Poverty Level', 
+                          'People Living Below Twice the Poverty Level',
+                          'Total Number >= 25 Years Old',
                           'Number >= 25 Years Old without a High School Diploma',
                           'People Living in Linguistic Isolation']
 
@@ -588,10 +589,10 @@ class FacilityProximityAssessment:
 
         # Create column headers
         self.worksheet_facility.merge_range("A2:A3", 'Population Basis', self.formats['sub_header_2'])
-        self.worksheet_facility.write_string("A4", 'Nationwide Demographics (2015-2019 ACS)', self.formats['sub_header_3'])
-        self.worksheet_facility.write_rich_string("A5", 'Nationwide (2010 Decennial Census)',  self.formats['superscript']
+        self.worksheet_facility.write_string("A4", 'Nationwide Demographics (2016-2020 ACS)', self.formats['sub_header_3'])
+        self.worksheet_facility.write_rich_string("A5", 'Nationwide (2020 Decennial Census)',  self.formats['superscript']
                                                   , '5', self.formats['sub_header_3'])
-        self.worksheet_facility.write_number("B5", 312459649, self.formats['number'])
+        self.worksheet_facility.write_number("B5", 334753155, self.formats['number'])
         self.worksheet_facility.merge_range("B2:N2", '',  self.formats['sub_header_3'])
         self.worksheet_facility.write_rich_string("B2", 'Demographic Group',  self.formats['superscript']
                                                   , '1', self.formats['sub_header_3'])
@@ -626,14 +627,14 @@ class FacilityProximityAssessment:
         self.worksheet_facility.write_rich_string(firstcol+str(first_notes_row)
           , 'Notes:\n'
           , self.formats['superscript'], '1'
-          , ('The demographic percentages are based on the Census’ 2015-2019 American Community Survey five-year averages, at the block group level, and '
+          , ('The demographic percentages are based on the Census’ 2016-2020 American Community Survey five-year averages, at the block group level, and '
              'include the 50 states, the District of Columbia, and Puerto Rico. Demographic percentages based on different averages may differ. The total '
-             'population of each facility and of the entire run group are based on block level data from the 2010 Decennial Census. Populations by demographic '
-             'group for each facility and for the run group are determined by multiplying each 2010 Decennial block population within the indicated radius by the '
+             'population of each facility and of the entire run group are based on block level data from the 2020 Decennial Census. Populations by demographic '
+             'group for each facility and for the run group are determined by multiplying each 2020 Decennial block population within the indicated radius by the '
              'ACS demographic percentages describing the block group containing each block, and then summing over the appropriate area (facility-specific or run '
              'group-wide).\n')
           , self.formats['superscript'], '2'
-          , 'Minority population is the total population minus the white population.\n'
+          , 'The People of Color population is the total population minus the White population.\n'
           , self.formats['superscript'], '3'
           , ('To avoid double counting, the "Hispanic or Latino" category is treated as a distinct demographic category for these analyses. A person is identified '
              'as one of five racial/ethnic categories above: White, African American, Native American, Other and Multiracial, or Hispanic/Latino. A person who '
@@ -644,9 +645,11 @@ class FacilityProximityAssessment:
              'linguistically isolated households in the block group, assuming that the number of individuals per household is the same for linguistically isolated '
              'households as for the general population, and summed over all block groups.\n')
           , self.formats['superscript'], '5'
-          , ('The nationwide 2010 Decennial Census population of 312,459,649 is the summation of all Census block populations within the 50 states, the '
-             'District of Columbia, and Puerto Rico. Block level population will be updated based on the 2020 Decennial Census, once processed and quality- '
-             'assured for these analyses.\n')
+          , ('The nationwide 2020 Decennial Census population of 334,753,155 is the summation of all Census block populations within the 50 states, the '
+             'District of Columbia, and Puerto Rico. Note that the nationwide population based on the 2020 '
+             'Decennial Census is greater than the nationwide population based on the five year '
+             '2016-2020 American Community Survey averages, because the populations in most states '
+             'have increased over this five year period.\n')
           , self.formats['superscript'], '6'
           , ('The population tally and demographic analysis of the total population surrounding all facilities as a whole takes into account neighboring facilities '
              'with overlapping study areas and ensures populations in common are counted only once.')
@@ -659,10 +662,12 @@ class FacilityProximityAssessment:
         #------------ Sortable Spreadsheet ----------------------------------------------
 
         sort_headers = ['Population Basis', 'Longitude', 'Latitude', 'Total Population', 'White', 
-                          'Minority', 'African American',
+                          'People of Color', 'African American',
                           'Native American', 'Other and Multiracial', 'Hispanic or Latino',
                           'Age (Years)\n0-17', 'Age (Years)\n18-64', 'Age (Years)\n>=65',
-                          'People Living Below the Poverty Level', 'Total Number >= 25 Years Old',
+                          'People Living Below the Poverty Level', 
+                          'People Living Below Twice the Poverty Level', 
+                          'Total Number >= 25 Years Old',
                           'Number >= 25 Years Old without a High School Diploma',
                           'People Living in Linguistic Isolation']
         

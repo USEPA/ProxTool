@@ -116,7 +116,7 @@ class MainView(tk.Frame):
         # Load auxiliary files
         # Create censusblks dataframe
         try:
-            censusblks = CensusDataset(path="resources/us_blocks_2010.csv")
+            censusblks = CensusDataset(path="resources/us_blocks_2020.csv")
         except BaseException as e:
             messagebox.showinfo("Error", "An error has occurred while trying to read the census block input file (csv format). \n" +
                                 "The error says: \n\n" + str(e))
