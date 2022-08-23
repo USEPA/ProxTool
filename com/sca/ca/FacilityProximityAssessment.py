@@ -220,7 +220,7 @@ class FacilityProximityAssessment:
                 
         # Write out any missing blockgroups
         if len(self.missingbkgrps) > 0:
-            missfname = self.filename_entry + '_' + 'missing_block_groups' + '_' + str(self.radius) + 'km.txt'
+            missfname = self.filename_entry + '_' + 'defaulted_block_groups' + '_' + str(self.radius) + 'km.txt'
             misspath = os.path.join(self.fullpath, missfname)
             
             with open(misspath, 'w') as f:
@@ -356,7 +356,7 @@ class FacilityProximityAssessment:
             blksinrange_df['bkgrp'] = blksinrange_df['blkid'].astype(str).str[:12]
                         
             # Merge with ACS blockgroup data
-            # Note: Not all blockgroups in blksinrange_gdf will be in the ACS blockgroup data
+            # Note: Not all blockgroups in blksinrange_df will be in the ACS blockgroup data
             commonACS_df = blksinrange_df.merge(
                 self.acs_df.astype({'bkgrp': 'str'}), how='inner', left_on='bkgrp', right_on='bkgrp')
 
