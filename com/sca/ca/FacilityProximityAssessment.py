@@ -7,6 +7,7 @@ Created on Wed Jul 21 14:06:32 2021
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import os
+import csv
 import numpy as np
 import xlsxwriter
 import pandas as pd
@@ -37,8 +38,8 @@ class FacilityProximityAssessment:
         # Initialize list of used blocks
         self.used_blocks = []
         
-        # Initialize set to hold missing blockgroups
-        self.missingbkgrps = set()
+        # Initialize missing blockgroups list
+        self.missingbkgrps = []
 
         # Specify range in km
         self.radius = int(radius)
@@ -218,14 +219,15 @@ class FacilityProximityAssessment:
         self.calculate_distances()
         self.close_workbook()
                 
-        # Write out any missing blockgroups
+        # Write out any defaulted blockgroups
         if len(self.missingbkgrps) > 0:
-            missfname = self.filename_entry + '_' + 'missing_block_groups' + '_' + str(self.radius) + 'km.txt'
+            missfname = self.filename_entry + '_' + 'defaulted_block_groups' + '_' + str(self.radius) + 'km.txt'
             misspath = os.path.join(self.fullpath, missfname)
+
             
             with open(misspath, 'w') as f:
-                for item in self.missingbkgrps:
-                    f.write("%s\n" % item)
+                wr = csv.writer(f, delimiter="-")
+                wr.writerows(self.missingbkgrps)
         
 
     def calculate_distances(self):
@@ -330,7 +332,7 @@ class FacilityProximityAssessment:
             
             fac_lat = row['lat']
             fac_lon = row['lon']
-            
+                        
             # Subset census DF to half latitude above and half below and one longitude
             # west and east of this facility
             census_box = self.censusblks_df[(self.censusblks_df['lat'] >= fac_lat-0.5)
@@ -356,41 +358,67 @@ class FacilityProximityAssessment:
             blksinrange_df['bkgrp'] = blksinrange_df['blkid'].astype(str).str[:12]
                         
             # Merge with ACS blockgroup data
-            # Note: Not all blockgroups in blksinrange_gdf will be in the ACS blockgroup data
-            commonACS_df = blksinrange_df.merge(
+            # Note: Not all blockgroups in blksinrange_df will be in the ACS blockgroup data
+            acsinrange_df = blksinrange_df.merge(
                 self.acs_df.astype({'bkgrp': 'str'}), how='inner', left_on='bkgrp', right_on='bkgrp')
 
             # Identify any census blockgroups that are not in the ACS blockgroup data
-            missing_df = blksinrange_df[(~blksinrange_df.bkgrp.isin(commonACS_df.bkgrp))].copy()
+            missing_df = blksinrange_df[(~blksinrange_df.bkgrp.isin(acsinrange_df.bkgrp))].copy()
+            missing_list = missing_df['bkgrp'].unique().tolist()
             
-            if len(missing_df) == 0:
-                acsinrange_df = commonACS_df
-                
-            else:
-                # Add these missing blockgroups to the missing set
-                missbkgrp = missing_df['bkgrp'].tolist()
-                self.missingbkgrps.update(missbkgrp)
-                
-                # First try to default missing blockgroups to tracts
+            if len(missing_df) > 0:
+
+                # First try to default missing blockgroups by tracts from the ACS default file
                 missing_df['tract'] = missing_df['bkgrp'].str[:11]
                 missing_w_tract = missing_df.merge(
                     self.acsCountyTract_df, how='inner', left_on='tract', right_on='ID')
-                
-                # Next, consider counties
-                if (len(commonACS_df) + len(missing_w_tract)) != len(blksinrange_df):
-                    missing_df['county'] = missing_df['bkgrp'].str[:5]
-                    stillmissing_df = missing_df[(~missing_df.tract.isin(self.acsCountyTract_df.ID))]
-                    missing_w_county = stillmissing_df.merge(
-                        self.acsCountyTract_df, how='inner', left_on='county', right_on='ID')
-                
-                    if (len(commonACS_df) + len(missing_w_tract) + len(missing_w_county)) != len(blksinrange_df):
-                        completelymissing_df = stillmissing_df[(~stillmissing_df.county.isin(self.acsCountyTract_df.ID))]
-                        # messagebox.showinfo("Warning", "There are some census blocks that could not be matched to " +
-                        #                     "ACS blockgroup or ACS default data.")
-                    acsinrange_df = commonACS_df.append([missing_w_tract,missing_w_county], ignore_index=True)
-                else:
-                    acsinrange_df = commonACS_df.append(missing_w_tract, ignore_index=True)
 
+                if len(missing_w_tract) > 0:
+                    acsinrange_df = acsinrange_df.append(missing_w_tract, ignore_index=True)
+                    bg_defaulted_by_tract = missing_w_tract['bkgrp'].unique().tolist()
+                    for b in bg_defaulted_by_tract:
+                        self.missingbkgrps.append([b, 'defaulted by tract'])
+                
+                    # Remove tract defaulted blockgroups from the missing list
+                    missing_list = [bg for bg in missing_list if bg not in bg_defaulted_by_tract]
+            
+                # See if there are still missing blockgroups and if so then use the nearest blockgroup
+                # from the ACS default file
+                if len(missing_list) > 0:
+                    stillmissing_df = missing_df[missing_df['bkgrp'].isin(missing_list)]
+                    missing_w_nearest = stillmissing_df.merge(
+                            self.acsCountyTract_df, how='inner', left_on='bkgrp', right_on='ID')
+                
+                    if len(missing_w_nearest) > 0:
+                        acsinrange_df = acsinrange_df.append(missing_w_nearest, ignore_index=True)
+                        bg_defaulted_by_nearest = missing_w_nearest['bkgrp'].unique().tolist()
+                        for b in bg_defaulted_by_nearest:
+                            self.missingbkgrps.append([b, 'defaulted by nearest block group'])
+
+                        # Remove nearest defaulted blockgroups from the missing list
+                        missing_list = [bg for bg in missing_list if bg not in bg_defaulted_by_nearest]
+
+                    # For these missing blockgroups, use county default
+                    if len(missing_list) > 0:
+                        deepmissing_df = missing_df[missing_df['bkgrp'].isin(missing_list)]
+                        deepmissing_df['county'] = deepmissing_df['bkgrp'].str[:5]
+                        missing_w_county = deepmissing_df.merge(
+                                self.acsCountyTract_df, how='inner', left_on='county', right_on='ID')
+
+                        if len(missing_w_county) > 0:
+                            acsinrange_df = acsinrange_df.append(missing_w_county, ignore_index=True)
+                            bg_defaulted_by_county = missing_w_county['bkgrp'].unique().tolist()
+                            for b in bg_defaulted_by_county:
+                                self.missingbkgrps.append([b, 'defaulted by county'])
+
+                            # Remove county defaulted blockgroups from the missing list
+                            missing_list = [bg for bg in missing_list if bg not in bg_defaulted_by_county]
+
+                        # At this point, these blockgroups really are missing
+                        if len(missing_list) > 0:
+                            for b in missing_list:
+                                self.missingbkgrps.append([b, 'could not be defaulted'])
+                    
 
             acs_columns = ['blkid', 'population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
                            'pnh_am_ind', 'pt_hisp', 'pnh_othmix', 'p_agelt18', 'p_agegt64',
