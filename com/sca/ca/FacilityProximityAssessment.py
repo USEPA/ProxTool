@@ -221,7 +221,8 @@ class FacilityProximityAssessment:
                 
         # Write out any defaulted blockgroups
         if len(self.missingbkgrps) > 0:
-            missfname = self.filename_entry + '_' + 'defaulted_block_groups' + '_' + str(self.radius) + 'km.txt'
+            missfname = os.path.splitext(self.filename_entry)[0] + '_' + 'defaulted_block_groups' + '_' +\
+                        str(self.radius) + 'km.txt'
             misspath = os.path.join(self.fullpath, missfname)
 
             
@@ -584,6 +585,7 @@ class FacilityProximityAssessment:
             os.mkdir(output_dir)
         filename = os.path.join(output_dir, self.filename_entry + '.xlsx')
         self.workbook = xlsxwriter.Workbook(filename)
+        self.worksheet_readme = self.workbook.add_worksheet('Background ReadMe')
         self.worksheet_facility = self.workbook.add_worksheet('Facility Demographics')
         self.worksheet_sort = self.workbook.add_worksheet('Sortable %')
         self.formats = self.create_formats(self.workbook)
@@ -605,7 +607,21 @@ class FacilityProximityAssessment:
         lastcol = chr(ord(firstcol) + len(column_headers))
         top_header_coords = firstcol+'1:'+lastcol+'1'
 
-        # Set first column width to 16; all others to 12
+        # Add static content to the readme tab
+        background_text = "This analysis used the Proximity Tool  to (1) identify all census blocks within a " +\
+            "specified radius of the latitude/longitude location of each facility, and then (2) link each block " +\
+            "with census-based demographic data. In addition to facility-specific demographics, the Proximity " +\
+            "Tool also computes the demographic composition of the population within the specified radius for all " +\
+            "facilities as a whole (e.g., source category-wide). Finally, this analysis allows for comparison of " +\
+            "these source category-wide demographics at the specified radius to the demographic composition of the " +\
+            "nationwide population. The Proximity Tool was created by SC&A Inc. in 2021 under contract to the U.S. " +\
+            "EPA, and has been updated based on the 2020 Decennial Census and the 2016-2020 American Community " +\
+            "Survey demographics."
+
+        self.worksheet_readme.merge_range("A2:B2", 'BACKGROUND:', self.formats['sub_header_4'])
+        self.worksheet_readme.merge_range("A4:I13", background_text, self.formats['notes'])
+
+    # Set first column width to 16; all others to 12
         self.worksheet_facility.set_column("A1:A1", 16)
         self.worksheet_facility.set_column("B1:"+lastcol+"1", 12)
         
