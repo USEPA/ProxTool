@@ -46,7 +46,7 @@ class MainView(tk.Frame):
 
         # First step - choose a facilities list file
         self.step1 = tk.Label(self.faclist_frame,
-                              text="1. Browse to select the input file of latitude/longitude locations around which the tool will analyze demographics.", font=SMALL_TEXT_FONT, bg='white', anchor="w")
+                              text='1. Browse to select the input file of latitude/longitude locations around which the tool will analyze demographics. \n    There is a Sample Template file in the “Inputs” folder to use to format your input file.', font=SMALL_TEXT_FONT, bg='white', anchor="w", justify="left")
         self.step1.grid(pady=10, row=3, column=0)
 
         self.inputs1_frame = tk.Frame(self.faclist_frame, height=32, padx=20, bg='white')

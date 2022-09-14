@@ -583,7 +583,7 @@ class FacilityProximityAssessment:
         output_dir = self.fullpath
         if not (os.path.exists(output_dir) or os.path.isdir(output_dir)):
             os.mkdir(output_dir)
-        filename = os.path.join(output_dir, self.filename_entry + '.xlsx')
+        filename = os.path.join(output_dir, self.filename_entry)
         self.workbook = xlsxwriter.Workbook(filename)
         self.worksheet_readme = self.workbook.add_worksheet('Background ReadMe')
         self.worksheet_facility = self.workbook.add_worksheet('Facility Demographics')
