@@ -80,26 +80,17 @@ class MainView(tk.Frame):
 
         # Third step - choose an output file location
         self.step3 = tk.Label(self.folder_frame,
-                              text="3. Browse to select the output folder and enter the name to be given to the output file of demographic results.",
+                              text="3.  Enter the name to be given to the output file of demographic results, which will be located in the “output” folder.",
                               font=SMALL_TEXT_FONT, bg='white', anchor="w")
         self.step3.grid(pady=10, row=3, column=0)
 
         self.inputs3_frame = tk.Frame(self.folder_frame, height=32, padx=20, bg='white')
         self.inputs3_frame.grid(row=4, columnspan=1, sticky="nsew")
 
-        fu = PIL.Image.open('images\icons8-document-48.png').resize((30, 30))
-        ficon = self.add_margin(fu, 5, 0, 5, 0)
-        fileicon = ImageTk.PhotoImage(ficon)
-        self.outputfileLabel = tk.Label(self.inputs3_frame, image=fileicon, bg='white')
-        self.outputfileLabel.image = fileicon
-        self.outputfileLabel.grid(row=4, column=0)
-
-        self.step3_instructions = tk.Label(self.inputs3_frame, text="Select file",
-                                           font=SMALL_TEXT_FONT, bg='white', anchor="w")
-        self.step3_instructions.grid(row=4, column=1)
-        self.fileLabel.bind("<Button-1>", partial(self.browse_output_file, self.step3_instructions))
-        self.step3_instructions.bind("<Button-1>", partial(self.browse_output_file, self.step3_instructions))
-
+        self.output_file_name = EntryWithPlaceholder(
+            self.inputs3_frame, placeholder="Enter a file name", name="filename")
+        self.output_file_name["width"] = 24
+        self.output_file_name.grid(row=4, column=0, pady=10)
 
         self.run_button = tk.Label(self.container, text="Run", font=TEXT_FONT,
                                    bg='lightgrey', relief='solid', borderwidth=2, width=8)
@@ -162,8 +153,14 @@ class MainView(tk.Frame):
         faclist_df = faclist.dataframe
         print("Loaded facility data")
 
-        name_only = os.path.basename(self.output_file)
-        folder = os.path.dirname(self.output_file)
+        name_only = self.output_file_name.get_text_value()
+        folder = "output"
+
+        try:
+            if not os.path.exists(folder):
+                os.makedirs(folder)
+        except OSError:
+            print ('Error: Creating directory. ' + folder)
 
         assessment = FacilityProximityAssessment(filename_entry=name_only,
                                                  output_dir=folder,
@@ -206,8 +203,8 @@ class MainView(tk.Frame):
         self.run_button["text"] = "Run"
         self.run_button["state"] = "normal"
         self.step1_instructions["text"] = "Select file"
-        self.step3_instructions["text"] = "Select file"
         self.radius_num.put_placeholder()
+        self.output_file_name.put_placeholder()
         self.home.update_idletasks()
 
     # The input file browse handler.
@@ -217,16 +214,6 @@ class MainView(tk.Frame):
             return
 
         icon["text"] = self.facility_list_file.split("/")[-1]
-
-    # The output file browse handler.
-    def browse_output_file(self, icon, event):
-        self.output_file = tkinter.filedialog.asksaveasfilename(defaultextension=".xlsx",
-                                                                filetypes=(("Excel workbook", "*.xlsx"),
-                                                                           ("All Files", "*.*")))
-        if not self.output_file:
-            return
-
-        icon["text"] = self.output_file.split("/")[-1]
 
     def add_margin(self, pil_img, top, right, bottom, left):
         width, height = pil_img.size
