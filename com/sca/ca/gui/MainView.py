@@ -67,7 +67,7 @@ class MainView(tk.Frame):
 
         # Second step - choose a radius
         self.step2 = tk.Label(self.radius_frame,
-                              text="2. Enter the radius to be analyzed around each location.", font=SMALL_TEXT_FONT, bg='white', anchor="w")
+                              text="2. Enter the radius (km) to be analyzed around each location.", font=SMALL_TEXT_FONT, bg='white', anchor="w")
         self.step2.grid(pady=10, row=3, column=0)
 
         self.inputs2_frame = tk.Frame(self.radius_frame, height=32, padx=20, bg='white')
@@ -80,7 +80,7 @@ class MainView(tk.Frame):
 
         # Third step - choose an output file location
         self.step3 = tk.Label(self.folder_frame,
-                              text="3.  Enter the name to be given to the output file of demographic results, which will be located in the “output” folder.",
+                              text="3.  Enter the name (without extension) to be given to the output file of demographic results, which will be located in the “output” folder.",
                               font=SMALL_TEXT_FONT, bg='white', anchor="w")
         self.step3.grid(pady=10, row=3, column=0)
 

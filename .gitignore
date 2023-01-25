@@ -130,3 +130,8 @@ dmypy.json
 
 .idea/
 
+# Resources
+/resources/us_blocks_2020.csv
+
+# Output folder
+/output

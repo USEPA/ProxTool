@@ -24,7 +24,7 @@ class FacilityProximityAssessment:
                  acsCountyTract_df):
 
         # Output path
-        self.filename_entry = str(filename_entry)
+        self.filename_entry = str(filename_entry) + '.xlsx'
         self.fullpath = output_dir
         self.faclist_df = faclist_df
         self.censusblks_df = census_df
