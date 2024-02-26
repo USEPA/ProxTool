@@ -12,7 +12,7 @@ from com.sca.ca.FacilityProximityAssessment import FacilityProximityAssessment
 from com.sca.ca.gui.EntryWithPlaceHolder import EntryWithPlaceholder
 from com.sca.ca.gui.Styles import *
 from com.sca.ca.model.ACSDataset import ACSDataset
-from com.sca.ca.model.ACSCountyTract import ACSCountyTract
+from com.sca.ca.model.ACSdefaults import ACSdefaults
 from com.sca.ca.model.CensusDataset import CensusDataset
 from com.sca.ca.model.FacilityList import FacilityList
 
@@ -100,6 +100,11 @@ class MainView(tk.Frame):
 
     def run_reports(self, event):
 
+        # Make sure a list of facilities with  locations was entered
+        if self.facility_list_file == None:
+            messagebox.showinfo("Input error!", "Please select an input facility file.")
+            return
+        
         print("Creating a proximity analysis!")
 
         self.show_running()
@@ -129,16 +134,16 @@ class MainView(tk.Frame):
         self.acs_df = acs.dataframe
         print("Loaded ACS data")
 
-        # Create acs county/tract dataframe
+        # Create ACS default dataframe
         try:
-            acsDefault = ACSCountyTract(path="resources/acs-levels.csv")
+            acsDefault = ACSdefaults(path="resources/acs_defaults.csv")
         except BaseException as e:
-            messagebox.showinfo("Error", "An error has occurred while trying to read the ACS tract/county input file (csv format). \n" +
+            messagebox.showinfo("Error", "An error has occurred while trying to read the ACS default input file (csv format). \n" +
                                 "The error says: \n\n" + str(e))
             self.reset_run_button()
             return
             
-        self.acsCountyTract_df = acsDefault.dataframe
+        self.acsDefault_df = acsDefault.dataframe
         print("Loaded ACS County/Tract data")
 
         # Create faclist dataframe
@@ -168,7 +173,7 @@ class MainView(tk.Frame):
                                                  radius=self.radius_num.get_text_value(),
                                                  census_df=self.censusblks_df,
                                                  acs_df=self.acs_df,
-                                                 acsCountyTract_df=self.acsCountyTract_df)
+                                                 acsDefault_df=self.acsDefault_df)
     
         while True:
             try:        
