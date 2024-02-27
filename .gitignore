@@ -133,6 +133,6 @@ dmypy.json
 # Resources
 /resources/us_blocks_2020.csv
 
-# Output and input folders
+# Output and Input folders
 /output
 /Inputs
