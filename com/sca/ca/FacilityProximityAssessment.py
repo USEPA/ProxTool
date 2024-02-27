@@ -582,14 +582,14 @@ class FacilityProximityAssessment:
         top_header_coords = firstcol+'1:'+lastcol+'1'
 
         # Add static content to the readme tab
-        background_text = "This analysis used the Proximity Tool  to (1) identify all census blocks within a " +\
+        background_text = "This analysis used the Proximity Tool to (1) identify all census blocks within a " +\
             "specified radius of the latitude/longitude location of each facility, and then (2) link each block " +\
             "with census-based demographic data. In addition to facility-specific demographics, the Proximity " +\
             "Tool also computes the demographic composition of the population within the specified radius for all " +\
-            "facilities as a whole (e.g., source category-wide). Finally, this analysis allows for comparison of " +\
+            "facilities in the run group (e.g., source category-wide). Finally, this analysis allows for comparison of " +\
             "these source category-wide demographics at the specified radius to the demographic composition of the " +\
             "nationwide population. The Proximity Tool was created by SC&A Inc. in 2021 under contract to the U.S. " +\
-            "EPA, and has been updated based on the 2020 Decennial Census and the 2018-2022 American Community " +\
+            "EPA and has been updated based on the 2020 Decennial Census and the 2018-2022 American Community " +\
             "Survey demographics."
 
         self.worksheet_readme.merge_range("A2:B2", 'BACKGROUND:', self.formats['sub_header_4'])
@@ -665,11 +665,11 @@ class FacilityProximityAssessment:
           , self.formats['superscript'], '5'
           , ('The nationwide 2020 Decennial Census population of 334,753,155 is the summation of all Census block populations within the 50 states, the '
              'District of Columbia, and Puerto Rico. Note that the nationwide population based on the 2020 '
-             'Decennial Census differs slightly from the nationwide population based on the five year '
-             '2018-2022 American Community Survey averages, because the former is a snapshot '
-             'while the latter is a five year average.\n')
+             'Decennial Census differs slightly from the nationwide population based on the five-year '
+             '2018-2022 American Community Survey averages, because the former is not based on '
+             'five-year average.\n')
           , self.formats['superscript'], '6'
-          , ('The population tally and demographic analysis of the total population surrounding all facilities as a whole takes into account neighboring facilities '
+          , ('The population tally and demographic analysis of the total population surrounding all facilities as a group takes into account neighboring facilities '
              'with overlapping study areas and ensures populations in common are counted only once.')
           , self.formats['notes'])
 
