@@ -21,7 +21,7 @@ from com.sca.ca.support.UTM import *
 class FacilityProximityAssessment:
 
     def __init__(self, filename_entry, output_dir, faclist_df, radius, census_df, acs_df, 
-                 acsCountyTract_df):
+                 acsDefault_df):
 
         # Output path
         self.filename_entry = str(filename_entry) + '.xlsx'
@@ -29,7 +29,7 @@ class FacilityProximityAssessment:
         self.faclist_df = faclist_df
         self.censusblks_df = census_df
         self.acs_df = acs_df
-        self.acsCountyTract_df = acsCountyTract_df
+        self.acsDefault_df = acsDefault_df
         self.formats = None
         self.facility_bin = None
         self.national_bin = None
@@ -259,7 +259,7 @@ class FacilityProximityAssessment:
         national_acs['pov2x'] = national_acs['p_2xpov'] * national_acs['pov_univ']
         national_acs['lingiso'] = national_acs['p_lingiso'] * national_acs['totalpop']
         national_acs['minority'] = national_acs['p_minority'] * national_acs['totalpop']
-        
+                
         self.national_bin[0][0] = national_acs['totalpop'].sum()
         self.national_bin[0][1] = national_acs[national_acs['p_minority'].notna()]['totalpop'].sum()
         self.national_bin[0][2] = national_acs[national_acs['pnh_afr_am'].notna()]['totalpop'].sum()
@@ -368,59 +368,27 @@ class FacilityProximityAssessment:
             missing_list = missing_df['bkgrp'].unique().tolist()
             
             if len(missing_df) > 0:
-
-                # First try to default missing blockgroups by tracts from the ACS default file
-                missing_df['tract'] = missing_df['bkgrp'].str[:11]
-                missing_w_tract = missing_df.merge(
-                    self.acsCountyTract_df, how='inner', left_on='tract', right_on='ID')
-
-                if len(missing_w_tract) > 0:
-                    acsinrange_df = acsinrange_df.append(missing_w_tract, ignore_index=True)
-                    bg_defaulted_by_tract = missing_w_tract['bkgrp'].unique().tolist()
-                    for b in bg_defaulted_by_tract:
-                        self.missingbkgrps.append([b, 'defaulted by tract'])
                 
-                    # Remove tract defaulted blockgroups from the missing list
-                    missing_list = [bg for bg in missing_list if bg not in bg_defaulted_by_tract]
-            
-                # See if there are still missing blockgroups and if so then use the nearest blockgroup
-                # from the ACS default file
+                # Look for the missing block groups in the default file
+                found_df = missing_df.merge(self.acsDefault_df, how='inner', on='bkgrp')
+
+                # Log the defaulted block groups
+                for b in found_df['bkgrp'].unique().tolist():
+                    if b not in self.missingbkgrps:
+                        self.missingbkgrps.append([b, 'Defaulted'])
+                
+                acsinrange_df = pd.concat([acsinrange_df, found_df], ignore_index=True)
+                
+                # Remove defaulted blockgroups from the missing list
+                missing_list = [bg for bg in missing_list if bg not in found_df['bkgrp'].to_list()]
+
+                # If there still are missing block groups, then that is an error. Log it.
                 if len(missing_list) > 0:
-                    stillmissing_df = missing_df[missing_df['bkgrp'].isin(missing_list)]
-                    missing_w_nearest = stillmissing_df.merge(
-                            self.acsCountyTract_df, how='inner', left_on='bkgrp', right_on='ID')
-                
-                    if len(missing_w_nearest) > 0:
-                        acsinrange_df = acsinrange_df.append(missing_w_nearest, ignore_index=True)
-                        bg_defaulted_by_nearest = missing_w_nearest['bkgrp'].unique().tolist()
-                        for b in bg_defaulted_by_nearest:
-                            self.missingbkgrps.append([b, 'defaulted by nearest block group'])
-
-                        # Remove nearest defaulted blockgroups from the missing list
-                        missing_list = [bg for bg in missing_list if bg not in bg_defaulted_by_nearest]
-
-                    # For these missing blockgroups, use county default
-                    if len(missing_list) > 0:
-                        deepmissing_df = missing_df[missing_df['bkgrp'].isin(missing_list)]
-                        deepmissing_df['county'] = deepmissing_df['bkgrp'].str[:5]
-                        missing_w_county = deepmissing_df.merge(
-                                self.acsCountyTract_df, how='inner', left_on='county', right_on='ID')
-
-                        if len(missing_w_county) > 0:
-                            acsinrange_df = acsinrange_df.append(missing_w_county, ignore_index=True)
-                            bg_defaulted_by_county = missing_w_county['bkgrp'].unique().tolist()
-                            for b in bg_defaulted_by_county:
-                                self.missingbkgrps.append([b, 'defaulted by county'])
-
-                            # Remove county defaulted blockgroups from the missing list
-                            missing_list = [bg for bg in missing_list if bg not in bg_defaulted_by_county]
-
-                        # At this point, these blockgroups really are missing
-                        if len(missing_list) > 0:
-                            for b in missing_list:
-                                self.missingbkgrps.append([b, 'could not be defaulted'])
+                    for b in missing_list:
+                        self.missingbkgrps.append([b, 'Error! Could not be defaulted'])
                     
 
+            # Set column names
             acs_columns = ['blkid', 'population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
                            'pnh_am_ind', 'pt_hisp', 'pnh_othmix', 'p_agelt18', 'p_agegt64',
                            'p_2xpov', 'p_pov', 'p_edulths', 'p_lingiso',
@@ -534,6 +502,12 @@ class FacilityProximityAssessment:
             self.used_blocks = list(set(allblks))
 
 
+        #Temp - write used_blocks to a file
+        with open('C:\\Git_CA\\ca\output\\PrimaryCopper_blocks.txt', 'w') as f:
+            for line in self.used_blocks:
+                f.write(f"{line}\n")        
+        # import pdb; pdb.set_trace() 
+        
         #----------- Process the run group bin --------------------
         
         # Calculate averages by dividing population for each sub group
@@ -563,7 +537,7 @@ class FacilityProximityAssessment:
             self.rungroup_bin, self.worksheet_facility, self.formats, 6)
 
         # Write to sortable sheet
-        self.worksheet_sort.write_string(1, 0, 'Nationwide Demographics (2016-2020 ACS)', self.formats['sub_header_3'])
+        self.worksheet_sort.write_string(1, 0, 'Nationwide Demographics (2018-2022 ACS)', self.formats['sub_header_3'])
         self.worksheet_sort.write_string(2, 0, 'Run group total', self.formats['sub_header_3'])
         sort_bin = self.rungroup_bin[1]
         sort_bin[0] = self.rungroup_bin[0][0]
@@ -608,14 +582,14 @@ class FacilityProximityAssessment:
         top_header_coords = firstcol+'1:'+lastcol+'1'
 
         # Add static content to the readme tab
-        background_text = "This analysis used the Proximity Tool  to (1) identify all census blocks within a " +\
+        background_text = "This analysis used the Proximity Tool to (1) identify all census blocks within a " +\
             "specified radius of the latitude/longitude location of each facility, and then (2) link each block " +\
             "with census-based demographic data. In addition to facility-specific demographics, the Proximity " +\
             "Tool also computes the demographic composition of the population within the specified radius for all " +\
-            "facilities as a whole (e.g., source category-wide). Finally, this analysis allows for comparison of " +\
+            "facilities in the run group (e.g., source category-wide). Finally, this analysis allows for comparison of " +\
             "these source category-wide demographics at the specified radius to the demographic composition of the " +\
             "nationwide population. The Proximity Tool was created by SC&A Inc. in 2021 under contract to the U.S. " +\
-            "EPA, and has been updated based on the 2020 Decennial Census and the 2016-2020 American Community " +\
+            "EPA and has been updated based on the 2020 Decennial Census and the 2018-2022 American Community " +\
             "Survey demographics."
 
         self.worksheet_readme.merge_range("A2:B2", 'BACKGROUND:', self.formats['sub_header_4'])
@@ -633,7 +607,7 @@ class FacilityProximityAssessment:
 
         # Create column headers
         self.worksheet_facility.merge_range("A2:A3", 'Population Basis', self.formats['sub_header_2'])
-        self.worksheet_facility.write_string("A4", 'Nationwide Demographics (2016-2020 ACS)', self.formats['sub_header_3'])
+        self.worksheet_facility.write_string("A4", 'Nationwide Demographics (2018-2022 ACS)', self.formats['sub_header_3'])
         self.worksheet_facility.write_rich_string("A5", 'Nationwide (2020 Decennial Census)',  self.formats['superscript']
                                                   , '5', self.formats['sub_header_3'])
         self.worksheet_facility.write_number("B5", 334753155, self.formats['number'])
@@ -671,7 +645,7 @@ class FacilityProximityAssessment:
         self.worksheet_facility.write_rich_string(firstcol+str(first_notes_row)
           , 'Notes:\n'
           , self.formats['superscript'], '1'
-          , ('The demographic percentages are based on the Census’ 2016-2020 American Community Survey five-year averages, at the block group level, and '
+          , ('The demographic percentages are based on the Census’ 2018-2022 American Community Survey five-year averages, at the block group level, and '
              'include the 50 states, the District of Columbia, and Puerto Rico. Demographic percentages based on different averages may differ. The total '
              'population of each facility and of the entire run group are based on block level data from the 2020 Decennial Census. Populations by demographic '
              'group for each facility and for the run group are determined by multiplying each 2020 Decennial block population within the indicated radius by the '
@@ -691,11 +665,11 @@ class FacilityProximityAssessment:
           , self.formats['superscript'], '5'
           , ('The nationwide 2020 Decennial Census population of 334,753,155 is the summation of all Census block populations within the 50 states, the '
              'District of Columbia, and Puerto Rico. Note that the nationwide population based on the 2020 '
-             'Decennial Census is greater than the nationwide population based on the five year '
-             '2016-2020 American Community Survey averages, because the populations in most states '
-             'have increased over this five year period.\n')
+             'Decennial Census differs slightly from the nationwide population based on the five-year '
+             '2018-2022 American Community Survey averages, because the former is not based on '
+             'five-year average.\n')
           , self.formats['superscript'], '6'
-          , ('The population tally and demographic analysis of the total population surrounding all facilities as a whole takes into account neighboring facilities '
+          , ('The population tally and demographic analysis of the total population surrounding all facilities as a group takes into account neighboring facilities '
              'with overlapping study areas and ensures populations in common are counted only once.')
           , self.formats['notes'])
 
