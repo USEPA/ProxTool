@@ -363,29 +363,56 @@ class FacilityProximityAssessment:
             acsinrange_df = blksinrange_df.merge(
                 self.acs_df.astype({'bkgrp': 'str'}), how='inner', left_on='bkgrp', right_on='bkgrp')
 
-            # Identify any census blockgroups that are not in the ACS blockgroup data
+            # Identify any unique census blockgroups that are not in the ACS blockgroup data
             missing_df = blksinrange_df[(~blksinrange_df.bkgrp.isin(acsinrange_df.bkgrp))].copy()
             missing_list = missing_df['bkgrp'].unique().tolist()
-            
+                            
             if len(missing_df) > 0:
                 
-                # Look for the missing block groups in the default file
-                found_df = missing_df.merge(self.acsDefault_df, how='inner', on='bkgrp')
-
-                # Log the defaulted block groups
-                for b in found_df['bkgrp'].unique().tolist():
+                # Look for the missing block groups in the default file using block group
+                bkgrp_defaults_df = self.acsDefault_df[self.acsDefault_df['rectype'] == 'BLKGRP']
+                found_df = bkgrp_defaults_df[bkgrp_defaults_df['tct'].isin(missing_list)]
+                
+                # Record the block groups defaulted by nearest block group
+                for b in found_df['tct'].unique().tolist():
                     if b not in self.missingbkgrps:
-                        self.missingbkgrps.append([b, 'Defaulted'])
+                        self.missingbkgrps.append([b, 'Defaulted to nearest block group'])
                 
                 acsinrange_df = pd.concat([acsinrange_df, found_df], ignore_index=True)
                 
                 # Remove defaulted blockgroups from the missing list
-                missing_list = [bg for bg in missing_list if bg not in found_df['bkgrp'].to_list()]
+                missing_list = [bg for bg in missing_list if bg not in found_df['tct'].to_list()]
 
-                # If there still are missing block groups, then that is an error. Log it.
+                # If there are still missing block groups, then use tract defaults
                 if len(missing_list) > 0:
-                    for b in missing_list:
-                        self.missingbkgrps.append([b, 'Error! Could not be defaulted'])
+                    tract_defaults_df = self.acsDefault_df[self.acsDefault_df['rectype'] == 'TCT']
+                    found_df = tract_defaults_df[tract_defaults_df['TCT'].isin(missing_list)]
+
+                    # Record the block groups defaulted by tract
+                    for b in found_df['tct'].unique().tolist():
+                        if b not in self.missingbkgrps:
+                            self.missingbkgrps.append([b, 'Defaulted by tract'])
+
+                    # Remove defaulted blockgroups from the missing list
+                    missing_list = [bg for bg in missing_list if bg not in found_df['tct'].to_list()]
+
+                    # If there are still missing block groups, then use county defaults
+                    if len(missing_list) > 0:
+                        cty_defaults_df = self.acsDefault[self.acsDefault['rectype'] == 'CTY']
+                        found_df = cty_defaults_df[cty_defaults_df['TCT'].isin(missing_list)]
+    
+                        # Record the block groups defaulted by county
+                        for b in found_df['tct'].unique().tolist():
+                            if b not in self.missingbkgrps:
+                                self.missingbkgrps.append([b, 'Defaulted by county'])
+    
+                        # Remove defaulted blockgroups from the missing list
+                        missing_list = [bg for bg in missing_list if bg not in found_df['tct'].to_list()]
+
+                        # If there are still missing block groups, then this is an error
+                        if len(missing_list) > 0:
+                            for b in missing_list:
+                                self.missingbkgrps.append([b, 'Error! Could not be defaulted'])
                     
 
             # Set column names
@@ -394,7 +421,6 @@ class FacilityProximityAssessment:
                            'p_2xpov', 'p_pov', 'p_edulths', 'p_lingiso',
                            'pov_univ', 'edu_univ', 'iso_univ']
             acsinrange_df = pd.DataFrame(acsinrange_df, columns=acs_columns)
-
                         
             #------------------------------------------------------------------------------------------
             # Create facility bin and tabulate population weighted demographic stats for each sub group.

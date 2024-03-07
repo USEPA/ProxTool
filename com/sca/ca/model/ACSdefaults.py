@@ -5,7 +5,7 @@ from com.sca.ca.model.CSVDataset import CSVDataset
 class ACSdefaults(CSVDataset):
 
     def get_columns(self):
-        return ['bkgrp', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
+        return ['rectype', 'tct', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
                 'pnh_am_ind', 'pt_hisp', 'pnh_othmix', 'p_agelt18', 'p_agegt64',
                 'p_2xpov', 'p_pov', 'p_edulths', 'p_lingiso', 'pov_univ', 'edu_univ', 'iso_univ']
 
@@ -15,7 +15,7 @@ class ACSdefaults(CSVDataset):
                 'pov_univ', 'p_2xpov', 'p_pov', 'edu_univ', 'p_edulths', 'p_lingiso', 'iso_univ']
 
     def get_string_columns(self):
-        return ['bkgrp']
+        return ['rectype', 'tct']
 
 
 
