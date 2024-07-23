@@ -45,7 +45,7 @@ class FacilityProximityAssessment:
         self.radius = int(radius)
 
         # Identify the relevant column indexes from the national and facility bins
-        self.active_columns = [0, 1, 15, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 10, 11, 14]
+        self.active_columns = [0, 1, 15, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 10, 11, 14, 17]
         
         # Needed columns from census block dataframe
         self.neededBlockColumns = ['blkid', 'population', 'lat', 'lon']
@@ -115,6 +115,20 @@ class FacilityProximityAssessment:
             'valign': 'vcenter',
             'text_wrap': 1})
 
+        formats['sub_header_6_light_grey'] = workbook.add_format({
+            'bold': 0,
+            'align': 'left',
+            'valign': 'vcenter',
+            'text_wrap': 1,
+            'bg_color': '#F2F2F2'})
+
+        formats['sub_header_6_dark_grey'] = workbook.add_format({
+            'bold': 0,
+            'align': 'left',
+            'valign': 'vcenter',
+            'text_wrap': 1,
+            'bg_color': '#D9D9D9'})
+
         formats['notes'] = workbook.add_format({
             'font_size': 11,
             'bold': 0,
@@ -125,8 +139,24 @@ class FacilityProximityAssessment:
         formats['number'] = workbook.add_format({
             'num_format': '#,##0'})
 
+        formats['number_light_grey'] = workbook.add_format({
+            'num_format': '#,##0',
+            'bg_color': '#F2F2F2'})
+
+        formats['number_dark_grey'] = workbook.add_format({
+            'num_format': '#,##0',
+            'bg_color': '#D9D9D9'})
+
         formats['percentage'] = workbook.add_format({
             'num_format': '0.0%'})
+
+        formats['percentage_light_grey'] = workbook.add_format({
+            'num_format': '0.0%',
+            'bg_color': '#F2F2F2'})
+
+        formats['percentage_dark_grey'] = workbook.add_format({
+            'num_format': '0.0%',
+            'bg_color': '#D9D9D9'})
 
         formats['int_percentage'] = workbook.add_format({
             'num_format': '0%'})
@@ -175,7 +205,7 @@ class FacilityProximityAssessment:
                     format = formats['percentage'] if row == 1 else formats['number']
                     # Override format for the National row
                     if numrows==1:
-                        format = formats['percentage'] if col > 0 else formats['number'] 
+                        format = formats['percentage_light_grey'] if col > 0 else formats['number_light_grey'] 
                     # Override format for the rungroup and facility total population percentage
                     if row==1 and col==0:
                         format = formats['int_percentage']
@@ -210,6 +240,7 @@ class FacilityProximityAssessment:
         self.rungroup_bin[0][14] += rungroup_df[rungroup_df['p_lingiso'].notna()]['population'].sum()
         self.rungroup_bin[0][15] += rungroup_df[rungroup_df['p_minority'].notna()]['population'].sum()
         self.rungroup_bin[0][16] += rungroup_df[rungroup_df['pov_univ'].notna()]['population'].sum()
+        self.rungroup_bin[0][17] += rungroup_df[rungroup_df['p_disability'].notna()]['population'].sum()
         
         self.rungroup_bin[1][1] += rungroup_df[rungroup_df['white'].notna()]['white'].sum()
         self.rungroup_bin[1][2] += rungroup_df[rungroup_df['black'].notna()]['black'].sum()
@@ -227,6 +258,7 @@ class FacilityProximityAssessment:
         self.rungroup_bin[1][14] += rungroup_df[rungroup_df['lingiso'].notna()]['lingiso'].sum()
         self.rungroup_bin[1][15] += rungroup_df[rungroup_df['minority'].notna()]['minority'].sum()
         self.rungroup_bin[1][16] += rungroup_df[rungroup_df['povuniv100'].notna()]['povuniv100'].sum()            
+        self.rungroup_bin[1][17] += rungroup_df[rungroup_df['disability'].notna()]['disability'].sum()            
         
 
 
@@ -257,7 +289,7 @@ class FacilityProximityAssessment:
         #------------------------------------------------------------------------------------------
         # Create national bin and tabulate population weighted demographic stats for each sub group.
         #------------------------------------------------------------------------------------------
-        self.national_bin = [[0]*17 for _ in range(2)]
+        self.national_bin = [[0]*18 for _ in range(2)]
 
         national_acs = self.acs_df
                 
@@ -277,6 +309,7 @@ class FacilityProximityAssessment:
         national_acs['pov2x'] = national_acs['p_2xpov'] * national_acs['pov_univ']
         national_acs['lingiso'] = national_acs['p_lingiso'] * national_acs['totalpop']
         national_acs['minority'] = national_acs['p_minority'] * national_acs['totalpop']
+        national_acs['disability'] = national_acs['p_disability'] * national_acs['dis_univ']
                 
         self.national_bin[0][0] = national_acs['totalpop'].sum()
         self.national_bin[0][1] = national_acs[national_acs['p_minority'].notna()]['totalpop'].sum()
@@ -298,6 +331,7 @@ class FacilityProximityAssessment:
         self.national_bin[0][14] = national_acs[national_acs['p_lingiso'].notna()]['totalpop'].sum()
         self.national_bin[0][15] = national_acs[national_acs['p_minority'].notna()]['totalpop'].sum()
         self.national_bin[0][16] = national_acs[national_acs['pov_univ'].notna()]['totalpop'].sum()
+        self.national_bin[0][17] = national_acs[national_acs['p_disability'].notna()]['totalpop'].sum()
 
         self.national_bin[1][1] = national_acs[national_acs['white'].notna()]['white'].sum()
         self.national_bin[1][2] = national_acs[national_acs['black'].notna()]['black'].sum()
@@ -315,12 +349,13 @@ class FacilityProximityAssessment:
         self.national_bin[1][14] = national_acs[national_acs['lingiso'].notna()]['lingiso'].sum()
         self.national_bin[1][15] = national_acs[national_acs['minority'].notna()]['minority'].sum()
         self.national_bin[1][16] = national_acs[national_acs['povuniv100'].notna()]['povuniv100'].sum()
+        self.national_bin[1][17] = national_acs[national_acs['disability'].notna()]['disability'].sum()
  
         # Only demographic percentages of the National bin will be reported
 
         # Calculate fractions by dividing population for each sub group.
         # Note that pov and 2xpov are divided by pov_univ and noHS is divided by edu_univ.
-        for index in range(1, 17):
+        for index in range(1, 18):
             self.national_bin[0][index] = self.national_bin[1][index] / (100 * self.national_bin[0][index])
             # if index == 12:
             #     self.national_bin[0][index] = self.national_bin[1][index] / (100 * self.national_bin[0][0])
@@ -333,7 +368,7 @@ class FacilityProximityAssessment:
         
         # Write to facility sheet and leave rows for the run group total
         start_row = self.append_aggregated_data(
-            self.national_bin, self.worksheet_facility, self.formats, start_row) + 5
+            self.national_bin, self.worksheet_facility, self.formats, start_row) + 3
 
         # Write to sortable sheet (row 1)
         data = deepcopy(self.national_bin)
@@ -351,7 +386,7 @@ class FacilityProximityAssessment:
             
             print('Calculating proximity for facility: ' + self.faclist_df['facility_id'][index])
                             
-            self.facility_bin = [[0]*17 for _ in range(2)]
+            self.facility_bin = [[0]*18 for _ in range(2)]
             
             fac_lat = row['lat']
             fac_lon = row['lon']
@@ -440,14 +475,14 @@ class FacilityProximityAssessment:
             # Set column names
             acs_columns = ['blkid', 'population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
                            'pnh_am_ind', 'pnh_asian', 'pt_hisp', 'pnh_othmix', 'p_agelt18', 'p_agegt64',
-                           'p_2xpov', 'p_pov', 'p_edulths', 'p_lingiso',
-                           'pov_univ', 'edu_univ', 'iso_univ']
+                           'p_2xpov', 'p_pov', 'p_edulths', 'p_lingiso', 'p_disability',
+                           'pov_univ', 'edu_univ', 'iso_univ', 'dis_univ']
             acsinrange_df = pd.DataFrame(acsinrange_df, columns=acs_columns)
                         
             #------------------------------------------------------------------------------------------
             # Create facility bin and tabulate population weighted demographic stats for each sub group.
             #------------------------------------------------------------------------------------------
-            self.facility_bin = [[0]*17 for _ in range(2)]
+            self.facility_bin = [[0]*18 for _ in range(2)]
             
             acsinrange_df['white'] = acsinrange_df['pnh_white'] * acsinrange_df['population']
             acsinrange_df['black'] = acsinrange_df['pnh_afr_am'] * acsinrange_df['population']
@@ -469,6 +504,10 @@ class FacilityProximityAssessment:
                                                               * acsinrange_df['population']
             acsinrange_df['lingiso'] = acsinrange_df['p_lingiso'] * acsinrange_df['population']
             acsinrange_df['minority'] = acsinrange_df['p_minority'] * acsinrange_df['population']
+            acsinrange_df['disability'] = (acsinrange_df['p_disability'] 
+                                           * acsinrange_df['population']
+                                           * acsinrange_df['dis_univ']
+                                           / acsinrange_df['totalpop'])
 
             self.facility_bin[0][0] = acsinrange_df['population'].sum()
             self.facility_bin[0][1] = acsinrange_df[acsinrange_df['p_minority'].notna()]['population'].sum()
@@ -490,6 +529,7 @@ class FacilityProximityAssessment:
             self.facility_bin[0][14] = acsinrange_df[acsinrange_df['p_lingiso'].notna()]['population'].sum()
             self.facility_bin[0][15] = acsinrange_df[acsinrange_df['p_minority'].notna()]['population'].sum()
             self.facility_bin[0][16] = acsinrange_df[acsinrange_df['pov_univ'].notna()]['population'].sum()
+            self.facility_bin[0][17] = acsinrange_df[acsinrange_df['p_disability'].notna()]['population'].sum()
             
             self.facility_bin[1][1] = acsinrange_df[acsinrange_df['white'].notna()]['white'].sum()
             self.facility_bin[1][2] = acsinrange_df[acsinrange_df['black'].notna()]['black'].sum()
@@ -507,9 +547,10 @@ class FacilityProximityAssessment:
             self.facility_bin[1][14] = acsinrange_df[acsinrange_df['lingiso'].notna()]['lingiso'].sum()
             self.facility_bin[1][15] = acsinrange_df[acsinrange_df['minority'].notna()]['minority'].sum()
             self.facility_bin[1][16] = acsinrange_df[acsinrange_df['povuniv100'].notna()]['povuniv100'].sum()            
+            self.facility_bin[1][17] = acsinrange_df[acsinrange_df['disability'].notna()]['disability'].sum()            
                                     
-            # Calculate facility averages by dividing population for each sub group
-            for col_index in range(1, 17):
+            # Calculate facility averages (percentages) by dividing population for each sub group
+            for col_index in range(1, 18):
                 if (self.facility_bin[0][col_index]) == 0:
                     self.facility_bin[1][col_index] = 0
                 else:
@@ -518,13 +559,11 @@ class FacilityProximityAssessment:
             self.facility_bin[1][0] = 1
                     
             # Compute people counts
-            self.facility_bin[0][16] = self.facility_bin[0][0] * self.facility_bin[1][16]
-            for col_index in range(1, 16):
-                self.facility_bin[0][col_index] = self.facility_bin[0][col_index] * self.facility_bin[1][col_index]
-                # if col_index == 11:
-                #     self.facility_bin[0][col_index] = self.facility_bin[0][11] * self.facility_bin[1][col_index]
-                # else:
-                #     self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
+            for col_index in range(1, 18):
+                if col_index == 16:
+                    self.facility_bin[0][col_index] = self.facility_bin[0][0] * self.facility_bin[1][col_index]
+                else:
+                    self.facility_bin[0][col_index] = self.facility_bin[0][col_index] * self.facility_bin[1][col_index]
         
 
             # Write to facility sheet
@@ -544,26 +583,32 @@ class FacilityProximityAssessment:
 
             # Add facility data to run group bin
             if self.rungroup_bin == None:
-                self.rungroup_bin = [[0]*17 for _ in range(2)]
+                self.rungroup_bin = [[0]*18 for _ in range(2)]
             self.tabulate_rungroup_data(acsinrange_df)
 
-            # Put blkid's from acsinrange_df into unique list of used blocks for later use by rungroup
+            # Put blkid's from acsinrange_df into list of used blocks for later printing
             acsblk_list = acsinrange_df['blkid'].tolist()
-            allblks = self.used_blocks
-            allblks.extend(acsblk_list)
-            self.used_blocks = list(set(allblks))
+            facblk_list = [[row['facility_id'],x] for x in acsblk_list]
+            self.used_blocks.extend(facblk_list)
+            # allblks = self.used_blocks
+            # allblks.extend(acsblk_list)
+            # self.used_blocks = list(set(allblks))
 
 
-        #Temp - write used_blocks to a file
-        with open('C:\\Git_CA\\ca\output\\PrimaryCopper_blocks.txt', 'w') as f:
-            for line in self.used_blocks:
-                f.write(f"{line}\n")        
+        # #Debug - write used_blocks to a file
+        # blocklist_fname = os.path.splitext(self.filename_entry)[0] + '_' + 'modeled_blocks.txt'
+        # blocklist_path = os.path.join(self.fullpath, blocklist_fname)
+        # with open(blocklist_path, 'w', newline='') as f:
+        #     wr = csv.writer(f, delimiter=",")
+        #     wr.writerows(self.used_blocks)
+        #     # for line in self.used_blocks:
+        #     #     f.write(f"{line}\n")        
 
         
         #----------- Process the run group bin --------------------
         
         # Calculate averages by dividing population for each sub group
-        for col_index in range(1, 17):
+        for col_index in range(1, 18):
             if (self.rungroup_bin[0][col_index]) == 0:
                 self.rungroup_bin[1][col_index] = 0
             else:
@@ -572,22 +617,20 @@ class FacilityProximityAssessment:
         self.rungroup_bin[1][0] = 1
 
         # Compute people counts
-        self.rungroup_bin[0][16] = self.rungroup_bin[0][0] * self.rungroup_bin[1][16]
-        for col_index in range(1, 16):
-            self.rungroup_bin[0][col_index] = self.rungroup_bin[0][col_index] * self.rungroup_bin[1][col_index]
-            # if col_index == 11:
-            #     self.rungroup_bin[0][col_index] = self.rungroup_bin[0][11] * self.rungroup_bin[1][col_index]
-            # else:
-            #     self.rungroup_bin[0][col_index] = self.rungroup_bin[0][0] * self.rungroup_bin[1][col_index]
+        for col_index in range(1, 18):
+            if col_index == 16:
+                self.rungroup_bin[0][col_index] = self.rungroup_bin[0][0] * self.rungroup_bin[1][col_index]
+            else:
+                self.rungroup_bin[0][col_index] = self.rungroup_bin[0][col_index] * self.rungroup_bin[1][col_index]
 
 
         #------- Write to facility sheet --------------
-        self.worksheet_facility.write_rich_string("A6", 'Run group total (pop.)',  self.formats['superscript']
-                                                  , ' 8', self.formats['sub_header_6'])
-        self.worksheet_facility.write_rich_string("A7", 'Run group total (pop.%)',  self.formats['superscript']
-                                                  , ' 8', self.formats['sub_header_6'])
+        self.worksheet_facility.write_rich_string("A5", 'Run group total (pop.)',  self.formats['superscript']
+                                                  , ' 9', self.formats['sub_header_6_dark_grey'])
+        self.worksheet_facility.write_rich_string("A6", 'Run group total (pop.%)',  self.formats['superscript']
+                                                  , ' 9', self.formats['sub_header_6_dark_grey'])
         start_row = self.append_aggregated_data(
-            self.rungroup_bin, self.worksheet_facility, self.formats, 5)
+            self.rungroup_bin, self.worksheet_facility, self.formats, 4)
 
         # Write to sortable sheet
         self.worksheet_sort.write_string(1, 0, 'Nationwide Demographics (2018-2022 ACS)', self.formats['sub_header_6'])
@@ -632,23 +675,24 @@ class FacilityProximityAssessment:
                           'People Living Below Twice the Poverty Level',
                           'People >= 25 Years Old',
                           'People >= 25 Years Old without a High School Diploma',
-                          'People Living in Limited English Speaking Households']
+                          'People Living in Limited English Speaking Households',
+                          'People with One or More Disabilities']
 
         firstcol = 'A'
         lastcol = chr(ord(firstcol) + len(column_headers))
         top_header_coords = firstcol+'1:'+lastcol+'1'
 
         # # Add static content to the readme tab        
-        self.worksheet_readme.write_string("A2", 'BACKGROUND:', self.formats['sub_header_4'])
-        self.worksheet_readme.write_string("A4", "This analysis used the Proximity Tool to (1) identify all census blocks within a")
-        self.worksheet_readme.write_string("A5", "specified radius of the latitude/longitude location of each facility, and then (2) link each block")
-        self.worksheet_readme.write_string("A6", "with census-based demographic data. In addition to facility-specific demographics, the Proximity ")
-        self.worksheet_readme.write_string("A7", "Tool also computes the demographic composition of the population within the specified radius for all ")
-        self.worksheet_readme.write_string("A8", "facilities in the run group as a whole (e.g., source category-wide). Finally, this analysis allows for comparison of ")
-        self.worksheet_readme.write_string("A9", "the facility-specific and source category-wide demographics at the specified radius to the nationwide demographics ")
-        self.worksheet_readme.write_string("A10", "of the U.S. population. The Proximity Tool was created by SC&A Inc. in 2021 under contract to the U.S. EPA ")
-        self.worksheet_readme.write_string("A11", "and has been updated most recently based on the 2020 Decennial Census population (at the census block level) ")
-        self.worksheet_readme.write_string("A12", "and the 2018-2022 American Community Survey demographics (at the census block group level).")
+        self.worksheet_readme.write_string("A1", 'BACKGROUND:', self.formats['sub_header_4'])
+        self.worksheet_readme.write_string("A2", "This analysis used the Proximity Tool to (1) identify all census blocks within a")
+        self.worksheet_readme.write_string("A3", "specified radius of the latitude/longitude location of each facility, and then (2) link each block")
+        self.worksheet_readme.write_string("A4", "with census-based demographic data. In addition to facility-specific demographics, the Proximity ")
+        self.worksheet_readme.write_string("A5", "Tool also computes the demographic composition of the population within the specified radius for all ")
+        self.worksheet_readme.write_string("A6", "facilities in the run group as a whole (e.g., source category-wide). Finally, this analysis allows for comparison of ")
+        self.worksheet_readme.write_string("A7", "the facility-specific and source category-wide demographics at the specified radius to the nationwide demographics ")
+        self.worksheet_readme.write_string("A8", "of the U.S. population. The Proximity Tool was created by SC&A Inc. in 2021 under contract to the U.S. EPA ")
+        self.worksheet_readme.write_string("A9", "and has been updated most recently based on the 2020 Decennial Census population (at the census block level) ")
+        self.worksheet_readme.write_string("A10", "and the 2018-2022 American Community Survey demographics (at the census block group level).")
 
         # self.worksheet_readme.merge_range("A4:I13", background_text, self.formats['notes'])
 
@@ -664,17 +708,17 @@ class FacilityProximityAssessment:
 
         # Create column headers
         self.worksheet_facility.write_string("A2", 'Population Basis', self.formats['sub_header_2'])
-        self.worksheet_facility.write_string("A3", 'Nationwide Demographics (2018-2022 ACS)', self.formats['sub_header_6'])
+        self.worksheet_facility.write_string("A3", 'Nationwide Demographics (2018-2022 ACS)', self.formats['sub_header_6_light_grey'])
         self.worksheet_facility.write_rich_string("A4", 'Nationwide (2020 Decennial Census)',  self.formats['superscript']
-                                                  , ' 7', self.formats['sub_header_6'])
-        self.worksheet_facility.write_number("B4", 334753155, self.formats['number'])
-        # self.worksheet_facility.merge_range("B2:N2", '',  self.formats['sub_header_3'])
-        # self.worksheet_facility.write_rich_string("B2", 'Demographic Group',  self.formats['superscript']
-        #                                           , '1', self.formats['sub_header_3'])
+                                                  , ' 8', self.formats['sub_header_6_light_grey'])
+        self.worksheet_facility.write_number("B4", 334753155, self.formats['number_light_grey'])
+        
+        # Shade the rest of the national 2020 row
+        self.worksheet_facility.conditional_format("B4:R4", {'type':'blanks', 'format':self.formats['number_light_grey']})
 
         self.worksheet_facility.set_row(1, 78, self.formats['sub_header_2'])
         # define superscripts of demographic headers
-        ss = {2:'2', 7:'3', 11:'4', 12:'4', 14:'5', 15:'6'}
+        ss = {2:'2', 7:'3', 11:'4', 12:'4', 14:'5', 15:'6', 16:'7'}
         for col_num, data in enumerate(column_headers):
             if col_num in ss:
                 # headers with superscripts
@@ -685,14 +729,14 @@ class FacilityProximityAssessment:
 
         # Add Facility Names
         facname_list = self.faclist_df['facility_id'].tolist()
-        row_num = 8
+        row_num = 6
         for index, data in enumerate(facname_list):
             self.worksheet_facility.write_string(row_num, 0, data + ' (pop.)', self.formats['sub_header_6'])
             row_num = row_num + 1
             self.worksheet_facility.write_string(row_num, 0, data + ' (pop.%)', self.formats['sub_header_6'])
             row_num = row_num + 1
 
-        last_data_row = 2 * len(facname_list) + 9
+        last_data_row = 2 * len(facname_list) + 6
 
         # Create notes
         first_notes_row = last_data_row + 1
@@ -706,7 +750,7 @@ class FacilityProximityAssessment:
           , "The demographic percentages are based on the 2020 Decennial Census' block populations, which are linked to the Census’ 2018-2022 American Community Survey (ACS) five-year demographic averages at the block group level. To derive")
         first_notes_row+=1
         self.worksheet_facility.write_string(firstcol+str(first_notes_row)
-          , "  demographic percentages, it is assumed a given block's demographics are the same as the block group in which it is contained. Demographics are tallied for all blocks falling within the indicated radius. ")
+          , "  demographic percentages, it is assumed a block's demographics are the same as the block group in which it is contained. Demographics are tallied for all blocks falling within the indicated radius. ")
         first_notes_row+=1
         self.worksheet_facility.write_rich_string(firstcol+str(first_notes_row)
           , self.formats['superscript'], '2'
@@ -726,11 +770,11 @@ class FacilityProximityAssessment:
              ))
         first_notes_row+=1
         self.worksheet_facility.write_string(firstcol+str(first_notes_row)
-          , ("based on the 2018-2022 ACS. The study area's facility-specific and run group-wide population counts are based on the methodology noted in footnote 1 to derive block-level demographic population counts for the study area,"
+          , ("based on the 2018-2022 ACS. The study area's population counts are based on the methodology noted in footnote 1 to derive block-level demographic population counts,"
              ))
         first_notes_row+=1
         self.worksheet_facility.write_string(firstcol+str(first_notes_row)
-          , ('which are then divided by the respective total block-level population (facility-specific and run group-wide) to derive the study area demographic percentages shown.'
+          , ('which are then divided by the respective total block-level population to derive the study area demographic percentages shown.'
              ))
                                                   
         first_notes_row+=1
@@ -751,6 +795,23 @@ class FacilityProximityAssessment:
         first_notes_row+=1
         self.worksheet_facility.write_rich_string(firstcol+str(first_notes_row)        
           , self.formats['superscript'], '7'
+          , ('The demographic percentages for people with one or more disabilities are based on Census ACS surveys at the tract level of '
+             'civilian non-institutionalized people (i.e., all U.S. civilians not residing in institutional group quarters facilities such as correctional institutions, '))
+        first_notes_row+=1
+        self.worksheet_facility.write_string(firstcol+str(first_notes_row)
+          , ('  juvenile facilities, skilled nursing facilities, and other long-term care living arrangements). To derive the nationwide '
+             'demographic percentages shown, these tract level tallies are summed for all tracts in the nation and then divided by the total U.S. population based on '))
+        first_notes_row+=1
+        self.worksheet_facility.write_string(firstcol+str(first_notes_row)
+          , ('  the 2018-2022 ACS. The study areas’ population counts are based on applying the Census tract level percentage of people with one or more disabilities '
+             'to each block group and block within the respective tract. The methodology noted in footnote 1 is then used '))
+        first_notes_row+=1
+        self.worksheet_facility.write_string(firstcol+str(first_notes_row)
+          , ('  to derive block-level demographic population counts, which are divided by the respective total block-level population to derive the study area '
+             'demographic percentages shown.'))
+        first_notes_row+=1        
+        self.worksheet_facility.write_rich_string(firstcol+str(first_notes_row)        
+          , self.formats['superscript'], '8'
           , ('The nationwide 2020 Decennial Census population of 334,753,155 is the summation of all Census block populations within the 50 states, the '
              'District of Columbia, and Puerto Rico. Note that the nationwide population based on the'))
         first_notes_row+=1
@@ -760,14 +821,19 @@ class FacilityProximityAssessment:
              'five-year average.'))
         first_notes_row+=1
         self.worksheet_facility.write_rich_string(firstcol+str(first_notes_row)        
-          , self.formats['superscript'], '8'
+          , self.formats['superscript'], '9'
           , ('The population tally and demographic analysis of the total population surrounding all facilities as a group takes into account neighboring facilities '
              'with overlapping study areas and ensures populations in common are counted only once.'))
-        first_notes_row+=1
 
-        # # Set row height for the notes
-        # self.worksheet_facility.set_row(first_notes_row-1, 230)
+        # Finally, shade the rungroup facility sheet rows dark grey for more contrast
+        self.worksheet_facility.conditional_format("B5:R5", {'type':'no_blanks', 'format':self.formats['number_dark_grey']})
+        self.worksheet_facility.conditional_format("B6:R6", {'type':'no_blanks', 'format':self.formats['percentage_dark_grey']})
 
+        # Also sahde the national and rungroup rows in the sortable sheet
+        self.worksheet_sort.conditional_format("A2:D2", {'type':'no_blanks', 'format':self.formats['number_light_grey']})
+        self.worksheet_sort.conditional_format("E2:T2", {'type':'no_blanks', 'format':self.formats['percentage_light_grey']})
+        self.worksheet_sort.conditional_format("A3:D3", {'type':'no_blanks', 'format':self.formats['number_dark_grey']})
+        self.worksheet_sort.conditional_format("E3:T3", {'type':'no_blanks', 'format':self.formats['percentage_dark_grey']})
 
         #------------ Sortable Spreadsheet ----------------------------------------------
 
@@ -779,7 +845,8 @@ class FacilityProximityAssessment:
                           'People Living Below Twice the Poverty Level', 
                           'People >= 25 Years Old',
                           'People >= 25 Years Old without a High School Diploma',
-                          'People Living in Limited English Speaking Households']
+                          'People Living in Limited English Speaking Households',
+                          'People with One or More Disabilities']
         
         firstcol = 'A'
         lastcol = chr(ord(firstcol) + len(sort_headers))
