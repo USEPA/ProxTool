@@ -16,6 +16,7 @@ from copy import deepcopy
 from decimal import ROUND_HALF_UP, Decimal, getcontext
 from com.sca.ca.support.UTM import *
 
+import time
 
 # Describe Demographics Within Range of Specified Facilities
 class FacilityProximityAssessment:
@@ -37,6 +38,7 @@ class FacilityProximityAssessment:
         
         # Initialize list of used blocks
         self.used_blocks = []
+        self.facility_blocks = []
         
         # Initialize missing blockgroups list
         self.missingbkgrps = []
@@ -50,7 +52,7 @@ class FacilityProximityAssessment:
         # Needed columns from census block dataframe
         self.neededBlockColumns = ['blkid', 'population', 'lat', 'lon']
         
-
+        
     def haversineDistance(self, lon1, lat1, lon2, lat2):
         """
         Calculate the great circle distance in kilometers between two points 
@@ -217,7 +219,7 @@ class FacilityProximityAssessment:
 
     
     def tabulate_rungroup_data(self, df):
-        
+                
         rungroup_df = df[~df['blkid'].isin(self.used_blocks)]
         
         self.rungroup_bin[0][0] += rungroup_df['population'].sum()
@@ -241,6 +243,7 @@ class FacilityProximityAssessment:
         self.rungroup_bin[0][15] += rungroup_df[rungroup_df['p_minority'].notna()]['population'].sum()
         self.rungroup_bin[0][16] += rungroup_df[rungroup_df['pov_univ'].notna()]['population'].sum()
         self.rungroup_bin[0][17] += rungroup_df[rungroup_df['p_disability'].notna()]['population'].sum()
+
         
         self.rungroup_bin[1][1] += rungroup_df[rungroup_df['white'].notna()]['white'].sum()
         self.rungroup_bin[1][2] += rungroup_df[rungroup_df['black'].notna()]['black'].sum()
@@ -364,12 +367,11 @@ class FacilityProximityAssessment:
  
         # Delete index 1 from the Natinal bin list. Only keeping percentages.
         del self.national_bin[-1]
-        
-        
+                
         # Write to facility sheet and leave rows for the run group total
         start_row = self.append_aggregated_data(
             self.national_bin, self.worksheet_facility, self.formats, start_row) + 3
-
+        
         # Write to sortable sheet (row 1)
         data = deepcopy(self.national_bin)
         # Keep relevant columns
@@ -383,7 +385,7 @@ class FacilityProximityAssessment:
         
         # Process each facility
         for index, row in self.faclist_df.iterrows():
-            
+                        
             print('Calculating proximity for facility: ' + self.faclist_df['facility_id'][index])
                             
             self.facility_bin = [[0]*18 for _ in range(2)]
@@ -423,7 +425,7 @@ class FacilityProximityAssessment:
             # Identify any unique census blockgroups that are not in the ACS blockgroup data
             missing_df = blksinrange_df[(~blksinrange_df.bkgrp.isin(acsinrange_df.bkgrp))].copy()
             missing_list = missing_df['bkgrp'].unique().tolist()
-                            
+               
             if len(missing_df) > 0:
                 
                 # Look for the missing block groups in the default file using block group
@@ -436,7 +438,7 @@ class FacilityProximityAssessment:
                         self.missingbkgrps.append([b, 'Defaulted to nearest block group'])
                 
                 acsinrange_df = pd.concat([acsinrange_df, found_df], ignore_index=True)
-                
+                                
                 # Remove defaulted blockgroups from the missing list
                 missing_list = [bg for bg in missing_list if bg not in found_df['tct'].to_list()]
 
@@ -471,7 +473,6 @@ class FacilityProximityAssessment:
                             for b in missing_list:
                                 self.missingbkgrps.append([b, 'Error! Could not be defaulted'])
                     
-
             # Set column names
             acs_columns = ['blkid', 'population', 'totalpop', 'p_minority', 'pnh_white', 'pnh_afr_am',
                            'pnh_am_ind', 'pnh_asian', 'pt_hisp', 'pnh_othmix', 'p_agelt18', 'p_agegt64',
@@ -565,11 +566,10 @@ class FacilityProximityAssessment:
                 else:
                     self.facility_bin[0][col_index] = self.facility_bin[0][col_index] * self.facility_bin[1][col_index]
         
-
             # Write to facility sheet
             start_row = self.append_aggregated_data(
                 self.facility_bin, self.worksheet_facility, self.formats, start_row)
-            
+           
             # Write facility to sortable sheet
             sort_bin = self.facility_bin[1]
             sort_bin[0] = self.facility_bin[0][0]
@@ -581,18 +581,22 @@ class FacilityProximityAssessment:
                 self.worksheet_sort.write_number(sort_row, col_num+3, data, format)
             sort_row = sort_row + 1
 
+
             # Add facility data to run group bin
             if self.rungroup_bin == None:
                 self.rungroup_bin = [[0]*18 for _ in range(2)]
             self.tabulate_rungroup_data(acsinrange_df)
 
-            # Put blkid's from acsinrange_df into list of used blocks for later printing
+            # Put blkid's from acsinrange_df into list of used blocks so the rungroup
+            # aggregation will not double count
             acsblk_list = acsinrange_df['blkid'].tolist()
+            allblks = self.used_blocks
+            allblks.extend(acsblk_list)
+            self.used_blocks = list(set(allblks))
+
+            # Also create list of blocks by facility. Useful for debugging.
             facblk_list = [[row['facility_id'],x] for x in acsblk_list]
-            self.used_blocks.extend(facblk_list)
-            # allblks = self.used_blocks
-            # allblks.extend(acsblk_list)
-            # self.used_blocks = list(set(allblks))
+            self.facility_blocks.extend(facblk_list)
 
 
         # #Debug - write used_blocks to a file
