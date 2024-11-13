@@ -104,6 +104,18 @@ class MainView(tk.Frame):
         if self.facility_list_file == None:
             messagebox.showinfo("Input error!", "Please select an input facility file.")
             return
+ 
+
+        # Make sure radius is an integer
+        if not self.radius_num.get_text_value().isnumeric():
+            messagebox.showinfo("Input error!", "Radius must be an integer (no decimals). Please re-enter.")
+            return
+
+        # And make sure radius is not more than 50km        
+        if int(self.radius_num.get_text_value()) > 50:
+            messagebox.showinfo("Input error!", "Radius cannot exceed 50km. Please re-enter.")
+            return
+
         
         print("Creating a proximity analysis!")
 

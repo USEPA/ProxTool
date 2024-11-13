@@ -715,7 +715,7 @@ class FacilityProximityAssessment:
         self.worksheet_facility.write_string("A3", 'Nationwide Demographics (2018-2022 ACS)', self.formats['sub_header_6_light_grey'])
         self.worksheet_facility.write_rich_string("A4", 'Nationwide (2020 Decennial Census)',  self.formats['superscript']
                                                   , ' 8', self.formats['sub_header_6_light_grey'])
-        self.worksheet_facility.write_number("B4", 334753155, self.formats['number_light_grey'])
+        self.worksheet_facility.write_number("B4", 334735155, self.formats['number_light_grey'])
         
         # Shade the rest of the national 2020 row
         self.worksheet_facility.conditional_format("B4:R4", {'type':'blanks', 'format':self.formats['number_light_grey']})
@@ -816,7 +816,7 @@ class FacilityProximityAssessment:
         first_notes_row+=1        
         self.worksheet_facility.write_rich_string(firstcol+str(first_notes_row)        
           , self.formats['superscript'], '8'
-          , ('The nationwide 2020 Decennial Census population of 334,753,155 is the summation of all Census block populations within the 50 states, the '
+          , ('The nationwide 2020 Decennial Census population of 334,735,155 is the summation of all Census block populations within the 50 states, the '
              'District of Columbia, and Puerto Rico. Note that the nationwide population based on the'))
         first_notes_row+=1
         self.worksheet_facility.write_string(firstcol+str(first_notes_row)
