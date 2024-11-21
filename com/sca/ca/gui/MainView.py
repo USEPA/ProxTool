@@ -41,7 +41,7 @@ class MainView(tk.Frame):
         self.folder_frame.grid(row=5, columnspan=5, sticky="nsew")
 
         self.header = tk.Label(self.container, font=TEXT_FONT, bg='white', width=48,
-                               text="Proximity Analysis Tool")
+                               text="Proximity Analysis Tool v1.0")
         self.header.grid(row=2, column=1, sticky='WE', pady=10)
 
         # First step - choose a facilities list file
